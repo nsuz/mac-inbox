@@ -111,20 +111,33 @@ struct InboxTests {
         _ = try await inbox.refresh()
 
         server.reply(205)
-        try await inbox.markAsRead("1")
+        await inbox.markAsRead(Fixture.notification(Fixture.thread(id: "1")))
 
         #expect(inbox.notifications.map(\.id) == ["2"])
+        #expect(inbox.failedAction == nil)
     }
 
-    @Test func aThreadThatCouldNotBeMarkedAsReadStaysOnTheList() async throws {
+    @Test func aThreadThatCouldNotBeMarkedAsReadStaysOnTheListAndTheFailureIsReported() async throws {
         let inbox = makeInbox()
         server.reply(200, body: Fixture.page(Fixture.thread(id: "1")))
         _ = try await inbox.refresh()
 
         server.reply(502)
-        _ = try? await inbox.markAsRead("1")
+        await inbox.markAsRead(Fixture.notification(Fixture.thread(id: "1")))
 
         #expect(inbox.notifications.map(\.id) == ["1"])
+        #expect(inbox.failedAction?.title == "Couldn’t Mark “Fix popup position” as Read")
+        #expect(inbox.failedAction?.problem.actionMessage == "GitHub returned an error. The notification is still unread.")
+    }
+
+    @Test func aReportedFailureCanBeDismissed() async throws {
+        let inbox = makeInbox()
+        server.reply(502)
+        await inbox.markAsRead(Fixture.notification(Fixture.thread(id: "1")))
+
+        inbox.dismissFailedAction()
+
+        #expect(inbox.failedAction == nil)
     }
 
     @Test func aRefreshThatWasUnderwayWhileAThreadWasMarkedAsReadIsDiscarded() async throws {
@@ -136,7 +149,7 @@ struct InboxTests {
         let refreshing = Task { try await inbox.refresh() }
         await server.waitForRequests(2)
         server.reply(205)
-        try await inbox.markAsRead("1")
+        await inbox.markAsRead(Fixture.notification(Fixture.thread(id: "1")))
         gate.open()
         let refresh = try await refreshing.value
 
@@ -153,7 +166,7 @@ struct InboxTests {
 
         server.reply(200, body: #"{"html_url":"https://github.com/octo/app/pull/42#issuecomment-7"}"#)
         server.reply(205)
-        try await inbox.open(Fixture.notification(Fixture.pullRequest))
+        await inbox.open(Fixture.notification(Fixture.pullRequest))
 
         #expect(server.requests.dropFirst().map { $0.url?.absoluteString } == [
             "https://api.github.com/repos/octo/app/issues/comments/7",
@@ -169,7 +182,7 @@ struct InboxTests {
         server.reply(200, body: #"{"html_url":"https://github.com/octo/app/pull/42"}"#)
         server.reply(205)
 
-        try await inbox.open(Fixture.notification(Fixture.pullRequest))
+        await inbox.open(Fixture.notification(Fixture.pullRequest))
 
         #expect(server.requests.map { $0.url?.absoluteString } == [
             "https://api.github.com/repos/octo/app/issues/comments/7",
@@ -186,7 +199,7 @@ struct InboxTests {
         _ = try await inbox.refresh()
 
         server.reply(205)
-        try await inbox.open(Fixture.notification(checkSuite))
+        await inbox.open(Fixture.notification(checkSuite))
 
         #expect(browser.opened.map(\.path) == ["/octo/app/actions"])
         #expect(server.requests.last?.url?.absoluteString == "https://api.github.com/notifications/threads/1003")
@@ -198,7 +211,7 @@ struct InboxTests {
         server.reply(200, body: Fixture.page(Fixture.checkSuite))
         _ = try await inbox.refresh()
 
-        try await inbox.open(Fixture.notification(Fixture.checkSuite))
+        await inbox.open(Fixture.notification(Fixture.checkSuite))
 
         #expect(server.requests.count == 1)
         #expect(browser.opened == [URL(string: "https://github.com/notifications")!])
@@ -213,44 +226,75 @@ struct InboxTests {
         let inbox = makeInbox()
         server.reply(status, headers: headers, body: body)
 
-        try await inbox.open(Fixture.notification(Fixture.pullRequest))
+        await inbox.open(Fixture.notification(Fixture.pullRequest))
 
         #expect(server.requests.count == 1)
         #expect(browser.opened == [URL(string: "https://github.com/notifications")!])
     }
 
-    @Test func leavesTheThreadUnreadWhenTheBrowserCannotOpenIt() async throws {
+    @Test func leavesTheThreadUnreadAndReportsItWhenTheBrowserCannotOpenIt() async throws {
         let inbox = makeInbox()
         server.reply(200, body: Fixture.page(Fixture.pullRequest))
         _ = try await inbox.refresh()
         browser.accepts = false
         server.reply(200, body: #"{"html_url":"https://github.com/octo/app/pull/42#issuecomment-7"}"#)
 
-        await #expect(throws: Inbox.BrowserDidNotOpen.self) {
-            try await inbox.open(Fixture.notification(Fixture.pullRequest))
-        }
+        await inbox.open(Fixture.notification(Fixture.pullRequest))
+
         #expect(server.requests.count == 2)
         #expect(inbox.notifications.map(\.id) == ["1001"])
+        #expect(inbox.failedAction?.title == "Couldn’t Open “Fix popup position”")
+        #expect(inbox.failedAction?.problem.title == "Couldn’t Open the Browser")
     }
 
     @Test func aThreadThatIsBeingOpenedIsNotOpenedOrMarkedAgainMeanwhile() async throws {
         let inbox = makeInbox()
         let notification = Fixture.notification(Fixture.pullRequest)
         let gate = server.replyLater(200, body: #"{"html_url":"https://github.com/octo/app/pull/42"}"#)
-        let opening = Task { try await inbox.open(notification) }
+        let opening = Task { await inbox.open(notification) }
         await server.waitForRequests(1)
 
-        try await inbox.open(notification)
-        try await inbox.markAsRead(notification.id)
+        await inbox.open(notification)
+        await inbox.markAsRead(notification)
         server.reply(205)
         gate.open()
-        try await opening.value
+        await opening.value
 
         #expect(server.requests.count == 2)
         #expect(browser.opened.count == 1)
     }
 
     // MARK: - Notification Center
+
+    @Test func showsNoBadgeUntilTheFirstRefreshHasSucceeded() async throws {
+        let inbox = makeInbox()
+        server.reply(502)
+        _ = try? await inbox.refresh()
+
+        #expect(inbox.badgeLabel == nil)
+    }
+
+    @Test func showsNoBadgeWhenNothingIsUnread() async throws {
+        let inbox = makeInbox()
+        server.reply(200, body: Fixture.page())
+        _ = try await inbox.refresh()
+
+        #expect(inbox.badgeLabel == nil)
+    }
+
+    @Test func badgesTheNumberOfUnreadThreadsOnceLoaded() async throws {
+        let inbox = makeInbox()
+        server.reply(200, body: Fixture.page(Fixture.thread(id: "1"), Fixture.thread(id: "2")))
+        _ = try await inbox.refresh()
+
+        #expect(inbox.badgeLabel == "2")
+    }
+
+    @Test func withdrawsNothingBeforeTheFirstRefreshHasSucceeded() {
+        let inbox = makeInbox()
+
+        #expect(inbox.staleDeliveries([.init(threadID: "1", login: "octo")], for: "octo").isEmpty)
+    }
 
     @Test func withdrawsDeliveredNotificationsThatAreNoLongerUnreadOrBelongToAnotherAccount() async throws {
         let inbox = makeInbox()

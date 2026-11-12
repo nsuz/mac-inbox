@@ -10,6 +10,11 @@ final class Inbox {
 
     struct BrowserDidNotOpen: Error {}
 
+    struct FailedAction {
+        let title: String
+        let problem: Problem
+    }
+
     struct Delivery {
         let threadID: GitHub.Notification.ID
         let login: String?
@@ -17,6 +22,12 @@ final class Inbox {
 
     private(set) var notifications: [GitHub.Notification] = []
     private(set) var isLoaded = false
+    private(set) var failedAction: FailedAction?
+
+    // Nothing until the first refresh: an empty list before then is not "no unread threads".
+    var badgeLabel: String? {
+        isLoaded && !notifications.isEmpty ? String(notifications.count) : nil
+    }
 
     @ObservationIgnored private let client: GitHub.Client
     @ObservationIgnored private let openURL: (URL) -> Bool
@@ -46,14 +57,14 @@ final class Inbox {
         client.resume()
     }
 
-    func markAsRead(_ id: GitHub.Notification.ID) async throws {
-        try await exclusively(id) {
-            try await recordRead(id)
+    func markAsRead(_ notification: GitHub.Notification) async {
+        await perform(on: notification, failing: "Couldn’t Mark “\(notification.subject.title)” as Read") {
+            try await recordRead(notification.id)
         }
     }
 
-    func open(_ notification: GitHub.Notification) async throws {
-        try await exclusively(notification.id) {
+    func open(_ notification: GitHub.Notification) async {
+        await perform(on: notification, failing: "Couldn’t Open “\(notification.subject.title)”") {
             let page = await webPage(of: notification)
             guard openURL(page ?? GitHub.inbox) else { throw BrowserDidNotOpen() }
             if page != nil {
@@ -62,10 +73,22 @@ final class Inbox {
         }
     }
 
-    private func exclusively(_ id: GitHub.Notification.ID, _ work: () async throws -> Void) async throws {
-        guard threadsInProgress.insert(id).inserted else { return }
-        defer { threadsInProgress.remove(id) }
-        try await work()
+    func reportFailure(_ error: any Error, opening notification: GitHub.Notification) {
+        failedAction = FailedAction(title: "Couldn’t Open “\(notification.subject.title)”", problem: Problem(error))
+    }
+
+    func dismissFailedAction() {
+        failedAction = nil
+    }
+
+    private func perform(on notification: GitHub.Notification, failing title: String, _ work: () async throws -> Void) async {
+        guard threadsInProgress.insert(notification.id).inserted else { return }
+        defer { threadsInProgress.remove(notification.id) }
+        do {
+            try await work()
+        } catch {
+            failedAction = FailedAction(title: title, problem: Problem(error))
+        }
     }
 
     private func recordRead(_ id: GitHub.Notification.ID) async throws {
@@ -91,6 +114,7 @@ final class Inbox {
     }
 
     func staleDeliveries(_ deliveries: [Delivery], for login: String) -> [GitHub.Notification.ID] {
+        guard isLoaded else { return [] }
         let unread = Set(notifications.map(\.id))
         return deliveries
             .filter { $0.login != login || !unread.contains($0.threadID) }

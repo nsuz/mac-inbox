@@ -8,17 +8,23 @@ enum GitHub {
         decoder.dateDecodingStrategy = .iso8601
         return decoder
     }()
+
+    static let encoder: JSONEncoder = {
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        return encoder
+    }()
 }
 
 extension GitHub {
-    struct Notification: Decodable, Identifiable, Hashable {
+    struct Notification: Codable, Identifiable, Hashable {
         let id: String
         let reason: String
         let updatedAt: Date
         let subject: Subject
         let repository: Repository
 
-        struct Subject: Decodable, Hashable {
+        struct Subject: Codable, Hashable {
             let title: String
             let type: String
             // Declared as required strings by the API reference, but null for CheckSuite threads in practice.
@@ -31,7 +37,7 @@ extension GitHub {
             }
         }
 
-        struct Repository: Decodable, Hashable {
+        struct Repository: Codable, Hashable {
             let fullName: String
             let htmlURL: URL
 

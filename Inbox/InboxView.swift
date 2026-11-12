@@ -6,7 +6,6 @@ struct InboxView: View {
     let poller: Poller
 
     @State private var selection: GitHub.Notification.ID?
-    @State private var failedAction: FailedAction?
     @Environment(\.openURL) private var openURL
 
     private var problem: Problem? {
@@ -33,7 +32,11 @@ struct InboxView: View {
             }
             .help("Open Notifications on GitHub")
         }
-        .alert(failedAction?.title ?? "", isPresented: $failedAction.isPresent, presenting: failedAction) { _ in
+        .alert(
+            inbox.failedAction?.title ?? "",
+            isPresented: Binding(get: { inbox.failedAction != nil }, set: { if !$0 { inbox.dismissFailedAction() } }),
+            presenting: inbox.failedAction
+        ) { _ in
         } message: { failedAction in
             Text(failedAction.problem.actionMessage)
         }
@@ -72,40 +75,16 @@ struct InboxView: View {
     }
 
     private func open(_ notification: GitHub.Notification) {
-        Task {
-            do {
-                try await inbox.open(notification)
-            } catch {
-                failedAction = FailedAction(title: "Couldn’t Open “\(notification.subject.title)”", problem: Problem(error))
-            }
-        }
+        Task { await inbox.open(notification) }
     }
 
     private func markAsRead(_ notification: GitHub.Notification) {
-        Task {
-            do {
-                try await inbox.markAsRead(notification.id)
-            } catch {
-                failedAction = FailedAction(title: "Couldn’t Mark “\(notification.subject.title)” as Read", problem: Problem(error))
-            }
-        }
+        Task { await inbox.markAsRead(notification) }
     }
 
     private func tryAgain() {
         inbox.resume()
         poller.resume()
-    }
-}
-
-private struct FailedAction {
-    let title: String
-    let problem: Problem
-}
-
-private extension Optional where Wrapped == FailedAction {
-    var isPresent: Bool {
-        get { self != nil }
-        set { if !newValue { self = nil } }
     }
 }
 
