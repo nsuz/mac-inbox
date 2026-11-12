@@ -179,6 +179,20 @@ struct InboxTests {
         #expect(browser.opened == [URL(string: "https://github.com/octo/app/pull/42")!])
     }
 
+    @Test func opensTheMatchingWorkflowRunsForACheckSuiteAndMarksItAsRead() async throws {
+        let inbox = makeInbox()
+        let checkSuite = Fixture.thread(id: "1003", reason: "ci_activity", title: "CI workflow run failed for main branch", type: "CheckSuite", url: nil, latestCommentURL: nil)
+        server.reply(200, body: Fixture.page(checkSuite))
+        _ = try await inbox.refresh()
+
+        server.reply(205)
+        try await inbox.open(Fixture.notification(checkSuite))
+
+        #expect(browser.opened.map(\.path) == ["/octo/app/actions"])
+        #expect(server.requests.last?.url?.absoluteString == "https://api.github.com/notifications/threads/1003")
+        #expect(inbox.notifications.isEmpty)
+    }
+
     @Test func opensGitHubsInboxAndLeavesTheThreadUnreadWhenItHasNoPageOfItsOwn() async throws {
         let inbox = makeInbox()
         server.reply(200, body: Fixture.page(Fixture.checkSuite))

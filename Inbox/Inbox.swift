@@ -75,6 +75,9 @@ final class Inbox {
     }
 
     private func webPage(of notification: GitHub.Notification) async -> URL? {
+        if let runs = notification.workflowRunsPage {
+            return runs
+        }
         for resource in [notification.subject.latestCommentURL, notification.subject.url].compactMap(\.self) {
             do {
                 return try await client.htmlURL(of: resource)
