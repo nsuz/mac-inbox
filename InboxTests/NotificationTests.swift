@@ -67,6 +67,10 @@ enum Fixture {
     static let pullRequest = thread(id: "1001")
     static let checkSuite = thread(id: "1002", reason: "ci_activity", title: "CI failed", type: "CheckSuite", url: nil, latestCommentURL: nil)
 
+    static func notification(_ thread: String) -> GitHub.Notification {
+        try! GitHub.decoder.decode(GitHub.Notification.self, from: Data(thread.utf8))
+    }
+
     static func page(_ threads: String...) -> String {
         "[" + threads.joined(separator: ",") + "]"
     }

@@ -6,7 +6,7 @@ struct InboxApp: App {
 
     var body: some Scene {
         Window("Inbox", id: "inbox") {
-            InboxView(inbox: appDelegate.inbox, account: appDelegate.account)
+            InboxView(inbox: appDelegate.inbox, account: appDelegate.account, poller: appDelegate.poller)
         }
     }
 }

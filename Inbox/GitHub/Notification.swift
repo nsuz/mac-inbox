@@ -1,6 +1,8 @@
 import Foundation
 
 enum GitHub {
+    static let inbox = URL(string: "https://github.com/notifications")!
+
     static let decoder: JSONDecoder = {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
