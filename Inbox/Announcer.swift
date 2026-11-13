@@ -9,12 +9,10 @@ final class Announcer: NSObject {
     private let center = UNUserNotificationCenter.current()
     private let inbox: Inbox
     private let account: Account
-    private let showInbox: () -> Void
 
-    init(inbox: Inbox, account: Account, showInbox: @escaping () -> Void) {
+    init(inbox: Inbox, account: Account) {
         self.inbox = inbox
         self.account = account
-        self.showInbox = showInbox
     }
 
     func register() {
@@ -23,6 +21,7 @@ final class Announcer: NSObject {
     }
 
     func announce(_ news: [GitHub.Notification]) {
+        let news = news.filter { !UserDefaults.standard.mutes(reason: $0.reason) }
         guard let login = account.login, !news.isEmpty else { return }
         Self.log.info("Announcing \(news.count, privacy: .public) threads")
         for notification in news {
@@ -60,9 +59,6 @@ final class Announcer: NSObject {
             await inbox.open(announcement.notification)
         } catch {
             inbox.reportFailure(error, opening: announcement.notification)
-        }
-        if inbox.failedAction != nil {
-            showInbox()
         }
     }
 }
