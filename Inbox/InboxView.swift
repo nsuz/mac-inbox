@@ -55,15 +55,22 @@ struct InboxView: View {
             notification(in: ids).map(open)
         }
         .overlay {
-            if !inbox.isLoaded {
-                ProgressView()
-            } else if inbox.notifications.isEmpty {
-                ContentUnavailableView("No Unread Notifications", systemImage: "tray")
+            if inbox.notifications.isEmpty {
+                if inbox.isLoaded {
+                    ContentUnavailableView("No Unread Notifications", systemImage: "tray")
+                } else if inbox.isRefreshing {
+                    ProgressView()
+                }
             }
         }
         .safeAreaInset(edge: .top, spacing: 0) {
             if let problem {
                 ProblemBanner(problem: problem, tryAgain: tryAgain)
+            }
+        }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if !inbox.isLoaded, inbox.isRefreshing, !inbox.notifications.isEmpty {
+                LoadingBar()
             }
         }
     }
@@ -85,6 +92,20 @@ struct InboxView: View {
     private func tryAgain() {
         inbox.resume()
         poller.resume()
+    }
+}
+
+private struct LoadingBar: View {
+    var body: some View {
+        HStack {
+            ProgressView()
+                .controlSize(.small)
+            Text("Loading Notifications…")
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 6)
+        .background(.bar)
     }
 }
 

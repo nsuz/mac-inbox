@@ -23,6 +23,78 @@ struct InboxTests {
         #expect(refresh.pollInterval == .seconds(60))
     }
 
+    @Test func theFirstLoadListsThreadsAsTheirPagesArrive() async throws {
+        let inbox = makeInbox()
+        server.reply(200, headers: ["Link": #"<https://api.github.com/notifications?page=2>; rel="next""#], body: Fixture.page(Fixture.thread(id: "1")))
+        let gate = server.replyLater(200, body: Fixture.page(Fixture.thread(id: "2")))
+
+        let refreshing = Task { try await inbox.refresh() }
+        await server.waitForRequests(2)
+
+        #expect(inbox.notifications.map(\.id) == ["1"])
+        #expect(!inbox.isLoaded)
+        gate.open()
+        _ = try await refreshing.value
+        #expect(inbox.notifications.map(\.id) == ["1", "2"])
+        #expect(inbox.isLoaded)
+    }
+
+    @Test func aLaterRefreshReplacesTheListOnlyOnceEveryPageHasArrived() async throws {
+        let inbox = makeInbox()
+        server.reply(200, body: Fixture.page(Fixture.thread(id: "1")))
+        _ = try await inbox.refresh()
+
+        server.reply(200, headers: ["Link": #"<https://api.github.com/notifications?page=2>; rel="next""#], body: Fixture.page(Fixture.thread(id: "2")))
+        let gate = server.replyLater(200, body: Fixture.page(Fixture.thread(id: "3")))
+        let refreshing = Task { try await inbox.refresh() }
+        await server.waitForRequests(3)
+
+        #expect(inbox.notifications.map(\.id) == ["1"])
+        gate.open()
+        _ = try await refreshing.value
+        #expect(inbox.notifications.map(\.id) == ["2", "3"])
+    }
+
+    @Test func theFirstLoadFinishesAroundAThreadMarkedAsReadMeanwhile() async throws {
+        let inbox = makeInbox()
+        server.reply(200, headers: ["Link": #"<https://api.github.com/notifications?page=2>; rel="next""#], body: Fixture.page(Fixture.thread(id: "1"), Fixture.thread(id: "2")))
+        let gate = server.replyLater(200, body: Fixture.page(Fixture.thread(id: "1"), Fixture.thread(id: "3")))
+        let refreshing = Task { try await inbox.refresh() }
+        await server.waitForRequests(2)
+
+        server.reply(205)
+        await inbox.markAsRead(Fixture.notification(Fixture.thread(id: "1")))
+        gate.open()
+        _ = try await refreshing.value
+
+        #expect(inbox.notifications.map(\.id) == ["2", "3"])
+        #expect(inbox.isLoaded)
+    }
+
+    @Test func aFirstLoadThatFailsPartwayKeepsWhatArrivedWithoutLookingLoadedOrBusy() async throws {
+        let inbox = makeInbox()
+        server.reply(200, headers: ["Link": #"<https://api.github.com/notifications?page=2>; rel="next""#], body: Fixture.page(Fixture.thread(id: "1")))
+        server.reply(502)
+
+        _ = try? await inbox.refresh()
+
+        #expect(inbox.notifications.map(\.id) == ["1"])
+        #expect(!inbox.isLoaded)
+        #expect(!inbox.isRefreshing)
+    }
+
+    @Test func isRefreshingOnlyWhileARefreshIsUnderway() async throws {
+        let inbox = makeInbox()
+        let gate = server.replyLater(502)
+        let refreshing = Task { try await inbox.refresh() }
+        await server.waitForRequests(1)
+
+        #expect(inbox.isRefreshing)
+        gate.open()
+        _ = try? await refreshing.value
+        #expect(!inbox.isRefreshing)
+    }
+
     @Test func isLoadedOnlyOnceARefreshHasSucceeded() async throws {
         let inbox = makeInbox()
         server.reply(502)
@@ -140,12 +212,12 @@ struct InboxTests {
         #expect(inbox.failedAction == nil)
     }
 
-    @Test func aRefreshThatWasUnderwayWhileAThreadWasMarkedAsReadIsDiscarded() async throws {
+    @Test func aThreadMarkedAsReadWhileARefreshIsUnderwayDoesNotComeBack() async throws {
         let inbox = makeInbox()
         server.reply(200, body: Fixture.page(Fixture.thread(id: "1"), Fixture.thread(id: "2")))
         _ = try await inbox.refresh()
 
-        let gate = server.replyLater(200, body: Fixture.page(Fixture.thread(id: "1"), Fixture.thread(id: "2")))
+        let gate = server.replyLater(200, headers: ["ETag": #""v2""#], body: Fixture.page(Fixture.thread(id: "1"), Fixture.thread(id: "2")))
         let refreshing = Task { try await inbox.refresh() }
         await server.waitForRequests(2)
         server.reply(205)
@@ -155,6 +227,25 @@ struct InboxTests {
 
         #expect(inbox.notifications.map(\.id) == ["2"])
         #expect(refresh.news.isEmpty)
+        server.reply(304)
+        _ = try await inbox.refresh()
+        #expect(server.requests.last?.value(forHTTPHeaderField: "If-None-Match") == #""v2""#)
+    }
+
+    @Test func aThreadMarkedAsReadWhileARefreshIsUnderwayComesBackWithNewerActivity() async throws {
+        let inbox = makeInbox()
+        server.reply(200, body: Fixture.page(Fixture.thread(id: "1", updatedAt: "2026-11-11T01:00:00Z")))
+        _ = try await inbox.refresh()
+
+        let gate = server.replyLater(200, body: Fixture.page(Fixture.thread(id: "1", updatedAt: "2026-11-11T02:00:00Z")))
+        let refreshing = Task { try await inbox.refresh() }
+        await server.waitForRequests(2)
+        server.reply(205)
+        await inbox.markAsRead(Fixture.notification(Fixture.thread(id: "1", updatedAt: "2026-11-11T01:00:00Z")))
+        gate.open()
+        _ = try await refreshing.value
+
+        #expect(inbox.notifications.map(\.id) == ["1"])
     }
 
     // MARK: - Opening

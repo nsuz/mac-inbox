@@ -22,6 +22,7 @@ final class Inbox {
 
     private(set) var notifications: [GitHub.Notification] = []
     private(set) var isLoaded = false
+    private(set) var isRefreshing = false
     private(set) var failedAction: FailedAction?
 
     // Nothing until the first refresh: an empty list before then is not "no unread threads".
@@ -32,7 +33,8 @@ final class Inbox {
     @ObservationIgnored private let client: GitHub.Client
     @ObservationIgnored private let openURL: (URL) -> Bool
     @ObservationIgnored private var etag: String?
-    @ObservationIgnored private var generation = 0
+    // Threads marked as read since the last refresh began, at the activity they were read at.
+    @ObservationIgnored private var readSinceRefreshBegan: [GitHub.Notification.ID: Date] = [:]
     @ObservationIgnored private var sightings = Sightings()
     @ObservationIgnored private var threadsInProgress = Set<GitHub.Notification.ID>()
 
@@ -42,12 +44,20 @@ final class Inbox {
     }
 
     func refresh() async throws -> Refresh {
-        let startedAt = generation
-        let unread = try await client.unread(ifNoneMatch: etag)
-        guard startedAt == generation, case let .modified(notifications, etag, _) = unread else {
+        readSinceRefreshBegan = [:]
+        isRefreshing = true
+        defer { isRefreshing = false }
+        // Only the first load shows pages as they arrive: once loaded, a partial list would make
+        // the threads on later pages look read.
+        let unread = try await client.unread(ifNoneMatch: etag) { arrived in
+            if !isLoaded {
+                notifications = stillUnread(arrived)
+            }
+        }
+        guard case let .modified(fetched, etag, _) = unread else {
             return Refresh(pollInterval: unread.pollInterval, news: [])
         }
-        self.notifications = notifications
+        notifications = stillUnread(fetched)
         self.etag = etag
         isLoaded = true
         return Refresh(pollInterval: unread.pollInterval, news: sightings.news(in: notifications))
@@ -59,7 +69,7 @@ final class Inbox {
 
     func markAsRead(_ notification: GitHub.Notification) async {
         await perform(on: notification, failing: "Couldn’t Mark “\(notification.subject.title)” as Read") {
-            try await recordRead(notification.id)
+            try await recordRead(notification)
         }
     }
 
@@ -68,7 +78,7 @@ final class Inbox {
             let page = await webPage(of: notification)
             guard openURL(page ?? GitHub.inbox) else { throw BrowserDidNotOpen() }
             if page != nil {
-                try await recordRead(notification.id)
+                try await recordRead(notification)
             }
         }
     }
@@ -91,10 +101,19 @@ final class Inbox {
         }
     }
 
-    private func recordRead(_ id: GitHub.Notification.ID) async throws {
-        try await client.markAsRead(id)
-        generation += 1
-        notifications.removeAll { $0.id == id }
+    private func recordRead(_ notification: GitHub.Notification) async throws {
+        try await client.markAsRead(notification.id)
+        readSinceRefreshBegan[notification.id] = notification.updatedAt
+        notifications.removeAll { $0.id == notification.id }
+    }
+
+    // Not discarding the refresh: during the first load that would leave the rest of the inbox
+    // unloaded until the next poll. A thread fetched before GitHub recorded the read is dropped;
+    // one with activity newer than what was read is unread again.
+    private func stillUnread(_ fetched: [GitHub.Notification]) -> [GitHub.Notification] {
+        fetched.filter { notification in
+            readSinceRefreshBegan[notification.id].map { notification.updatedAt > $0 } ?? true
+        }
     }
 
     private func webPage(of notification: GitHub.Notification) async -> URL? {

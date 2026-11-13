@@ -59,7 +59,7 @@ extension GitHub {
             consecutiveSecondaryLimits = 0
         }
 
-        func unread(ifNoneMatch etag: String?) async throws -> Unread {
+        func unread(ifNoneMatch etag: String?, progress: ([Notification]) -> Void = { _ in }) async throws -> Unread {
             var request = URLRequest(url: Self.notifications)
             request.setValue(etag, forHTTPHeaderField: "If-None-Match")
             let (data, response) = try await perform(request)
@@ -68,17 +68,21 @@ extension GitHub {
                 return .notModified(pollInterval: pollInterval)
             }
 
-            var notifications = try GitHub.decoder.decode([Notification].self, from: data)
+            var notifications: [Notification] = []
+            var seen = Set<Notification.ID>()
+            func collect(_ page: Data) throws {
+                notifications += try GitHub.decoder.decode([Notification].self, from: page).filter { seen.insert($0.id).inserted }
+                progress(notifications)
+            }
+
+            try collect(data)
             var next = Self.nextPage(of: response)
             while let url = next {
                 let (data, response) = try await perform(URLRequest(url: url))
-                notifications += try GitHub.decoder.decode([Notification].self, from: data)
+                try collect(data)
                 next = Self.nextPage(of: response)
             }
-
-            var seen = Set<Notification.ID>()
-            let unique = notifications.filter { seen.insert($0.id).inserted }
-            return .modified(unique, etag: response.value(forHTTPHeaderField: "ETag"), pollInterval: pollInterval)
+            return .modified(notifications, etag: response.value(forHTTPHeaderField: "ETag"), pollInterval: pollInterval)
         }
 
         func markAsRead(_ id: Notification.ID) async throws {

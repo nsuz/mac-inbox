@@ -52,6 +52,17 @@ struct ClientTests {
         #expect(server.requests.last?.value(forHTTPHeaderField: "If-None-Match") == nil)
     }
 
+    @Test func reportsWhatHasArrivedAfterEachPage() async throws {
+        server.reply(200, headers: ["Link": #"<https://api.github.com/notifications?page=2>; rel="next""#],
+                     body: Fixture.page(Fixture.thread(id: "1"), Fixture.thread(id: "2")))
+        server.reply(200, body: Fixture.page(Fixture.thread(id: "2"), Fixture.thread(id: "3")))
+        var reports: [[String]] = []
+
+        _ = try await makeClient().unread(ifNoneMatch: nil) { reports.append($0.map(\.id)) }
+
+        #expect(reports == [["1", "2"], ["1", "2", "3"]])
+    }
+
     @Test(arguments: [
         (["X-Poll-Interval": "120"], 120),
         (["X-Poll-Interval": "30"], 60),
