@@ -30,6 +30,14 @@ final class Inbox {
     private var isRestored = false
     private(set) var isRefreshing = false
     private(set) var failedAction: FailedAction?
+    // Threads marked as read in the window whose answer is still awaited. Only what is shown
+    // leaves at once; the list stays as GitHub has it, since withdrawing a delivered banner on
+    // the strength of a read that may yet fail could not be undone.
+    private var markingAsRead = Set<GitHub.Notification.ID>()
+
+    var shown: [GitHub.Notification] {
+        notifications.filter { !markingAsRead.contains($0.id) }
+    }
 
     // Nothing until the first refresh or a restored list: an empty list before then is not
     // "no unread threads".
@@ -190,8 +198,12 @@ final class Inbox {
         }
     }
 
+    // Called in a task that starts at once, the thread leaves what is shown before this returns:
+    // marking one thread after another must not wait for each answer.
     func markAsRead(_ notification: GitHub.Notification) async {
         await perform(on: notification, failing: "Couldn’t Mark “\(notification.subject.title)” as Read") {
+            markingAsRead.insert(notification.id)
+            defer { markingAsRead.remove(notification.id) }
             try await recordRead(notification)
         }
     }
@@ -209,7 +221,7 @@ final class Inbox {
     }
 
     func reportFailure(_ error: any Error, opening notification: GitHub.Notification) {
-        failedAction = FailedAction(title: "Couldn’t Open “\(notification.subject.title)”", problem: Problem(error))
+        report(FailedAction(title: "Couldn’t Open “\(notification.subject.title)”", problem: Problem(error)))
     }
 
     func dismissFailedAction() {
@@ -222,8 +234,14 @@ final class Inbox {
         do {
             try await work()
         } catch {
-            failedAction = FailedAction(title: title, problem: Problem(error))
+            report(FailedAction(title: title, problem: Problem(error)))
         }
+    }
+
+    // The first failure stays until dismissed: an alert ignores changes to what it presents.
+    // Whatever failed meanwhile is still unread and back in the list.
+    private func report(_ failure: FailedAction) {
+        failedAction = failedAction ?? failure
     }
 
     private func recordRead(_ notification: GitHub.Notification) async throws {

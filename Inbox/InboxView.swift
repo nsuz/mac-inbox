@@ -32,6 +32,9 @@ struct InboxView: View {
             }
             .help("Open Notifications on GitHub")
         }
+        .focusedSceneValue(\.selectedNotification, selected.map { notification in
+            SelectedNotification(open: { open(notification) }, markAsRead: { markAsRead(notification) })
+        })
         .alert(
             inbox.failedAction?.title ?? "",
             isPresented: Binding(get: { inbox.failedAction != nil }, set: { if !$0 { inbox.dismissFailedAction() } }),
@@ -43,7 +46,7 @@ struct InboxView: View {
     }
 
     private var list: some View {
-        List(inbox.notifications, selection: $selection) { notification in
+        List(inbox.shown, selection: $selection) { notification in
             NotificationRow(notification: notification, activity: inbox.activities[notification.id])
         }
         .contextMenu(forSelectionType: GitHub.Notification.ID.self) { ids in
@@ -55,7 +58,7 @@ struct InboxView: View {
             notification(in: ids).map(open)
         }
         .overlay {
-            if inbox.notifications.isEmpty {
+            if inbox.shown.isEmpty {
                 if inbox.isLoaded {
                     ContentUnavailableView("No Unread Notifications", systemImage: "tray")
                 } else if inbox.isRefreshing {
@@ -69,24 +72,41 @@ struct InboxView: View {
             }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            if !inbox.isLoaded, inbox.isRefreshing, !inbox.notifications.isEmpty {
+            if !inbox.isLoaded, inbox.isRefreshing, !inbox.shown.isEmpty {
                 LoadingBar()
             }
         }
     }
 
-    // The list selects one thread at a time: GitHub has no endpoint that marks a chosen set
-    // of threads as read, and one request per selected row would flood it.
+    private var selected: GitHub.Notification? {
+        selection.flatMap { id in inbox.shown.first { $0.id == id } }
+    }
+
+    // One row at a time rather than a chosen set: GitHub marks threads as read only one request
+    // at a time, so a large set would take far longer than a press seems to, and quitting midway
+    // would leave some of it unread.
     private func notification(in ids: Set<GitHub.Notification.ID>) -> GitHub.Notification? {
-        ids.first.flatMap { id in inbox.notifications.first { $0.id == id } }
+        ids.first.flatMap { id in inbox.shown.first { $0.id == id } }
     }
 
+    // The row leaves only once the thread is read, which depends on where it opened, so the
+    // selection moves then, and only if it is still on that row.
     private func open(_ notification: GitHub.Notification) {
-        Task { await inbox.open(notification) }
+        let successor = inbox.shown.successor(of: notification.id)
+        Task {
+            await inbox.open(notification)
+            if selection == notification.id, !inbox.isUnread(notification) {
+                selection = successor
+            }
+        }
     }
 
+    // Immediate, so that the row has left before the next key press.
     private func markAsRead(_ notification: GitHub.Notification) {
-        Task { await inbox.markAsRead(notification) }
+        if selection == notification.id {
+            selection = inbox.shown.successor(of: notification.id)
+        }
+        Task.immediate { await inbox.markAsRead(notification) }
     }
 
     private func tryAgain() {
@@ -131,5 +151,18 @@ private struct ProblemBanner: View {
         .padding(.horizontal)
         .padding(.vertical, 8)
         .background(.bar)
+    }
+}
+
+extension [GitHub.Notification] {
+    // The row that takes the place of one leaving through the viewer's own action, as Mail moves
+    // to the next message. Only then: had the row been read elsewhere, a row the viewer never
+    // chose would be selected and could be marked as read unawares.
+    func successor(of id: GitHub.Notification.ID) -> GitHub.Notification.ID? {
+        guard let index = firstIndex(where: { $0.id == id }) else { return nil }
+        if index + 1 < endIndex {
+            return self[index + 1].id
+        }
+        return index > startIndex ? self[index - 1].id : nil
     }
 }

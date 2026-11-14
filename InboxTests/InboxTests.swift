@@ -213,6 +213,64 @@ struct InboxTests {
         #expect(inbox.failedAction == nil)
     }
 
+    @Test func aThreadBeingMarkedAsReadLeavesWhatIsShownAtOnceButStaysUnreadUntilGitHubAnswers() async throws {
+        let inbox = makeInbox()
+        server.reply(200, body: Fixture.page(Fixture.thread(id: "1"), Fixture.thread(id: "2")))
+        _ = try await inbox.refresh()
+
+        let gate = server.replyLater(205)
+        let marking = Task.immediate { await inbox.markAsRead(Fixture.notification(Fixture.thread(id: "1"))) }
+
+        #expect(inbox.shown.map(\.id) == ["2"])
+        #expect(inbox.notifications.map(\.id) == ["1", "2"])
+        #expect(inbox.badgeLabel == "2")
+        gate.open()
+        await marking.value
+        #expect(inbox.shown.map(\.id) == ["2"])
+        #expect(inbox.notifications.map(\.id) == ["2"])
+        #expect(inbox.badgeLabel == "1")
+    }
+
+    @Test func aThreadThatCouldNotBeMarkedAsReadIsShownAgainWhereItWas() async throws {
+        let inbox = makeInbox()
+        server.reply(200, body: Fixture.page(Fixture.thread(id: "1"), Fixture.thread(id: "2"), Fixture.thread(id: "3")))
+        _ = try await inbox.refresh()
+
+        server.reply(502)
+        await inbox.markAsRead(Fixture.notification(Fixture.thread(id: "2")))
+
+        #expect(inbox.shown.map(\.id) == ["1", "2", "3"])
+    }
+
+    @Test func aThreadBeingMarkedAsReadIsNotShownAgainByARefreshThatStillListsItUnread() async throws {
+        let inbox = makeInbox()
+        server.reply(200, body: Fixture.page(Fixture.thread(id: "1"), Fixture.thread(id: "2")))
+        _ = try await inbox.refresh()
+
+        let gate = server.replyLater(205)
+        let marking = Task.immediate { await inbox.markAsRead(Fixture.notification(Fixture.thread(id: "1"))) }
+        server.reply(200, body: Fixture.page(Fixture.thread(id: "1"), Fixture.thread(id: "2")))
+        _ = try await inbox.refresh()
+
+        #expect(inbox.shown.map(\.id) == ["2"])
+        gate.open()
+        await marking.value
+        #expect(inbox.notifications.map(\.id) == ["2"])
+    }
+
+    // An alert's content cannot change once it is presented; a thread that failed later is
+    // back in the list for all to see.
+    @Test func aFailureWhileAnotherIsReportedLeavesTheReportAsItIs() async throws {
+        let inbox = makeInbox()
+        server.reply(502)
+        server.reply(502)
+
+        await inbox.markAsRead(Fixture.notification(Fixture.thread(id: "1")))
+        await inbox.markAsRead(Fixture.notification(Fixture.thread(id: "2", title: "Another thread")))
+
+        #expect(inbox.failedAction?.title == "Couldn’t Mark “Fix popup position” as Read")
+    }
+
     @Test func aThreadMarkedAsReadWhileARefreshIsUnderwayDoesNotComeBack() async throws {
         let inbox = makeInbox()
         server.reply(200, body: Fixture.page(Fixture.thread(id: "1"), Fixture.thread(id: "2")))

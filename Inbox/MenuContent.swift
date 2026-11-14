@@ -19,7 +19,7 @@ struct MenuContent: View {
             }
             Divider()
         }
-        ForEach(inbox.notifications.prefix(Self.limit)) { notification in
+        ForEach(inbox.shown.prefix(Self.limit)) { notification in
             Button {
                 Task { await inbox.open(notification) }
             } label: {
@@ -27,7 +27,7 @@ struct MenuContent: View {
                 Text(notification.repository.fullName)
             }
         }
-        if !inbox.notifications.isEmpty {
+        if !inbox.shown.isEmpty {
             Divider()
         }
         // Activating first: a menu bar extra's actions run while the app may be inactive, and

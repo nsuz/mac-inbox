@@ -10,6 +10,9 @@ struct InboxApp: App {
             InboxView(inbox: appDelegate.inbox, account: appDelegate.account, poller: appDelegate.poller)
                 .modifier(HandsOverOpenWindow(to: appDelegate))
         }
+        .commands {
+            NotificationCommands()
+        }
         MenuBarExtra(isInserted: $showsMenuBarExtra) {
             MenuContent(inbox: appDelegate.inbox, poller: appDelegate.poller)
         } label: {
