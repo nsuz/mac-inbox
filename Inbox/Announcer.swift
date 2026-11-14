@@ -20,12 +20,26 @@ final class Announcer: NSObject {
         center.setNotificationCategories([Announcement.category])
     }
 
-    func announce(_ news: [GitHub.Notification]) {
+    // Described first, so that a banner can tell what happened; a thread whose activity could not
+    // be described is still announced, with its reason alone. Each is announced only while it is
+    // still unread, since it can be read while it is being described or added.
+    func announce(_ news: [GitHub.Notification]) async {
         let news = news.filter { !UserDefaults.standard.mutes(reason: $0.reason) }
         guard let login = account.login, !news.isEmpty else { return }
-        Self.log.info("Announcing \(news.count, privacy: .public) threads")
-        for notification in news {
-            center.add(Announcement.request(for: notification, login: login))
+        await inbox.describe(news)
+        for notification in news where inbox.isUnread(notification) {
+            Self.log.info("Announcing a thread")
+            do {
+                try await center.add(Announcement.request(for: notification, activity: inbox.activity(describing: notification), login: login))
+            } catch {
+                Self.log.error("Couldn’t announce a thread: \(error, privacy: .public)")
+            }
+            // Read while it was being added, the withdrawal that the read set off may have looked
+            // before the notification was there.
+            if !inbox.isUnread(notification) {
+                center.removePendingNotificationRequests(withIdentifiers: [notification.id])
+                center.removeDeliveredNotifications(withIdentifiers: [notification.id])
+            }
         }
     }
 
@@ -46,8 +60,8 @@ final class Announcer: NSObject {
         }
     }
 
-    private func respond(login: String?, thread: Data?) async {
-        guard let announcement = Announcement(login: login, thread: thread) else {
+    private func respond(login: String?, thread: Data?, event: String?) async {
+        guard let announcement = Announcement(login: login, thread: thread, event: event) else {
             NSWorkspace.shared.open(GitHub.inbox)
             return
         }
@@ -56,7 +70,7 @@ final class Announcer: NSObject {
                 NSWorkspace.shared.open(GitHub.inbox)
                 return
             }
-            await inbox.open(announcement.notification)
+            await inbox.open(announcement.notification, at: announcement.event)
         } catch {
             inbox.reportFailure(error, opening: announcement.notification)
         }
@@ -79,6 +93,6 @@ extension Announcer: UNUserNotificationCenterDelegate {
     ) async {
         guard response.actionIdentifier == UNNotificationDefaultActionIdentifier else { return }
         let userInfo = response.notification.request.content.userInfo
-        await respond(login: userInfo["login"] as? String, thread: userInfo["thread"] as? Data)
+        await respond(login: userInfo["login"] as? String, thread: userInfo["thread"] as? Data, event: userInfo["event"] as? String)
     }
 }

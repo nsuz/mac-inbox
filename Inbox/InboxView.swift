@@ -44,7 +44,7 @@ struct InboxView: View {
 
     private var list: some View {
         List(inbox.notifications, selection: $selection) { notification in
-            NotificationRow(notification: notification)
+            NotificationRow(notification: notification, activity: inbox.activities[notification.id])
         }
         .contextMenu(forSelectionType: GitHub.Notification.ID.self) { ids in
             if let notification = notification(in: ids) {

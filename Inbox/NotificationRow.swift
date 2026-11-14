@@ -2,6 +2,9 @@ import SwiftUI
 
 struct NotificationRow: View {
     let notification: GitHub.Notification
+    let activity: GitHub.Activity?
+
+    private var state: GitHub.SubjectState? { activity?.state }
 
     var body: some View {
         Label {
@@ -11,7 +14,13 @@ struct NotificationRow: View {
                 HStack(spacing: 4) {
                     Text(notification.repository.fullName)
                     Text("·")
-                    Text(GitHub.Notification.describe(reason: notification.reason))
+                    Text(GitHub.Notification.describe(reason: notification.reason, type: notification.subject.type))
+                    if let event = activity?.unreadEvent(lastReadAt: notification.lastReadAt) {
+                        Text("·")
+                        // The first to give way when the row is narrow.
+                        Text(event.phrase)
+                            .layoutPriority(-1)
+                    }
                     Spacer()
                     Text(notification.updatedAt, format: .relative(presentation: .named))
                 }
@@ -20,32 +29,38 @@ struct NotificationRow: View {
                 .lineLimit(1)
             }
         } icon: {
-            Image(systemName: GitHub.Notification.symbol(for: notification.subject.type))
-                .accessibilityLabel(GitHub.Notification.describe(type: notification.subject.type))
+            Image(systemName: GitHub.Notification.symbol(for: notification.subject.type, state: state))
+                .foregroundStyle(state?.tint ?? .primary)
+                .help(GitHub.Notification.describe(type: notification.subject.type, state: state))
+                .accessibilityLabel(GitHub.Notification.describe(type: notification.subject.type, state: state))
         }
         .padding(.vertical, 4)
     }
 }
 
 extension GitHub.Notification {
-    static func describe(reason: String) -> String {
-        switch reason {
-        case "review_requested": "Review requested"
-        case "mention": "Mentioned"
-        case "team_mention": "Team mentioned"
-        case "assign": "Assigned"
-        case "author": "You created this"
-        case "comment": "You commented"
-        case "state_change": "You changed the state"
-        case "manual": "Subscribed"
-        case "subscribed": "Watching"
-        case "ci_activity": "Workflow run"
-        case "approval_requested": "Deployment approval requested"
-        case "security_alert": "Security alert"
-        case "security_advisory_credit": "Advisory credit"
-        case "invitation": "Invitation"
-        case "member_feature_requested": "Feature requested"
-        case "agent_session_finished": "Copilot session finished"
+    // How the thread stands to the viewer. Not what the viewer did: shown with every new activity,
+    // "You commented" would read as the news. Whole phrases, so that each can be translated whole.
+    static func describe(reason: String, type: String) -> String {
+        switch (reason, type) {
+        case ("review_requested", _): "Review requested"
+        case ("mention", _): "Mentioned"
+        case ("team_mention", _): "Team mentioned"
+        case ("assign", _): "Assigned"
+        case ("author", "PullRequest"): "Your pull request"
+        case ("author", "Issue"): "Your issue"
+        case ("author", "Discussion"): "Your discussion"
+        case ("author", _): "Yours"
+        case ("comment", _), ("state_change", _): "You took part"
+        case ("manual", _): "Subscribed"
+        case ("subscribed", _): "Watching"
+        case ("ci_activity", _): "Workflow run"
+        case ("approval_requested", _): "Deployment approval requested"
+        case ("security_alert", _): "Security alert"
+        case ("security_advisory_credit", _): "Advisory credit"
+        case ("invitation", _): "Invitation"
+        case ("member_feature_requested", _): "Feature requested"
+        case ("agent_session_finished", _): "Copilot session finished"
         default: sentence(from: reason)
         }
     }
@@ -61,8 +76,28 @@ extension GitHub.Notification {
         return words.prefix(1).localizedUppercase + words.dropFirst()
     }
 
-    static func symbol(for type: String) -> String {
-        switch type {
+    // Whole phrases rather than a state joined to a kind, so that each can be translated whole.
+    static func describe(type: String, state: GitHub.SubjectState?) -> String {
+        switch state {
+        case nil: describe(type: type)
+        case .open: type == "Issue" ? "Open issue" : "Open pull request"
+        case .draft: "Draft pull request"
+        case .merged: "Merged pull request"
+        case .closed: "Closed pull request"
+        case .completed: "Issue closed as completed"
+        case .notPlanned: "Issue closed as not planned"
+        case .duplicate: "Issue closed as duplicate"
+        }
+    }
+
+    static func symbol(for type: String, state: GitHub.SubjectState? = nil) -> String {
+        switch state {
+        case .merged: return "arrow.triangle.merge"
+        case .completed: return "checkmark.circle"
+        case .notPlanned, .duplicate: return "slash.circle"
+        case .open, .draft, .closed, nil: break
+        }
+        return switch type {
         case "PullRequest": "arrow.triangle.pull"
         case "Issue": "smallcircle.filled.circle"
         case "Discussion": "bubble.left.and.bubble.right"
@@ -71,6 +106,38 @@ extension GitHub.Notification {
         case "RepositoryVulnerabilityAlert", "RepositoryDependabotAlertsThread": "shield.lefthalf.filled"
         case "RepositoryInvitation": "person.badge.plus"
         default: "bell"
+        }
+    }
+}
+
+private extension GitHub.SubjectState {
+    // The colours GitHub gives each state.
+    var tint: Color {
+        switch self {
+        case .open: .green
+        case .merged, .completed: .purple
+        case .closed: .red
+        case .draft, .notPlanned, .duplicate: .secondary
+        }
+    }
+}
+
+extension GitHub.Event {
+    // GitHub shows a deleted account as "ghost".
+    var actorName: String {
+        actor ?? "ghost"
+    }
+
+    var phrase: String {
+        switch action {
+        case .commented: "\(actorName) commented"
+        case .approved: "\(actorName) approved"
+        case .requestedChanges: "\(actorName) requested changes"
+        case .reviewed: "\(actorName) reviewed"
+        case .merged: "\(actorName) merged"
+        case .closed: "\(actorName) closed"
+        case .reopened: "\(actorName) reopened"
+        case .markedReadyForReview: "\(actorName) marked this ready for review"
         }
     }
 }

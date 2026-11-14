@@ -267,6 +267,49 @@ struct InboxTests {
         #expect(inbox.notifications.isEmpty)
     }
 
+    @Test func opensTheUnreadEventItKnowsOfWithoutAskingGitHubWhereItIs() async throws {
+        let inbox = makeInbox()
+        server.reply(200, body: Fixture.page(Fixture.pullRequest))
+        _ = try await inbox.refresh()
+        server.reply(200, body: Self.mergedByHubot)
+        await inbox.describeThreads()
+
+        server.reply(205)
+        await inbox.open(Fixture.notification(Fixture.pullRequest))
+
+        #expect(server.requests.dropFirst(2).map { $0.url?.absoluteString } == ["https://api.github.com/notifications/threads/1001"])
+        #expect(browser.opened == [URL(string: "https://github.com/octo/app/pull/42#event-hubot")!])
+        #expect(inbox.notifications.isEmpty)
+    }
+
+    @Test func opensTheLatestCommentRatherThanAnEventAlreadyRead() async throws {
+        let inbox = makeInbox()
+        let thread = Fixture.thread(id: "1001", lastReadAt: "2026-11-11T02:45:00Z")
+        server.reply(200, body: Fixture.page(thread))
+        _ = try await inbox.refresh()
+        server.reply(200, body: Self.mergedByHubot)
+        await inbox.describeThreads()
+
+        server.reply(200, body: #"{"html_url":"https://github.com/octo/app/pull/42#issuecomment-7"}"#)
+        server.reply(205)
+        await inbox.open(Fixture.notification(thread))
+
+        #expect(browser.opened == [URL(string: "https://github.com/octo/app/pull/42#issuecomment-7")!])
+    }
+
+    @Test func opensTheEventABannerToldOfWithoutAskingGitHubWhereItIs() async throws {
+        let inbox = makeInbox()
+        server.reply(200, body: Fixture.page(Fixture.pullRequest))
+        _ = try await inbox.refresh()
+
+        server.reply(205)
+        await inbox.open(Fixture.notification(Fixture.pullRequest), at: URL(string: "https://github.com/octo/app/pull/42#pullrequestreview-9")!)
+
+        #expect(server.requests.dropFirst().map { $0.url?.absoluteString } == ["https://api.github.com/notifications/threads/1001"])
+        #expect(browser.opened == [URL(string: "https://github.com/octo/app/pull/42#pullrequestreview-9")!])
+        #expect(inbox.notifications.isEmpty)
+    }
+
     @Test func opensTheThreadItselfWhenTheLatestCommentIsGone() async throws {
         let inbox = makeInbox()
         server.reply(404, body: #"{"message":"Not Found"}"#)
@@ -402,6 +445,326 @@ struct InboxTests {
         )
 
         #expect(stale == ["2", "3"])
+    }
+
+    // MARK: - Describing threads
+
+    private static let mergedByHubot = Fixture.answer(Fixture.pullRequest(state: "MERGED", items: Fixture.event("MergedEvent", by: "hubot", at: "2026-11-11T02:40:00Z")))
+
+    private static func threads(_ count: Int) -> [String] {
+        (1...count).map { Fixture.thread(id: String($0)) }
+    }
+
+    private static func answer(describing count: Int, errors: [String] = []) -> String {
+        Fixture.answer(subjects: Array(repeating: Fixture.pullRequest(), count: count), errors: errors)
+    }
+
+    private func variables(of request: URLRequest) throws -> [String: Any] {
+        let body = try #require(try request.httpBody.flatMap { try JSONSerialization.jsonObject(with: $0) as? [String: Any] })
+        return try #require(body["variables"] as? [String: Any])
+    }
+
+    @Test func describesAThreadByWhereItsSubjectStandsAndTheLatestThingSomeoneElseDid() async throws {
+        let inbox = makeInbox()
+        server.reply(200, body: Fixture.page(Fixture.pullRequest))
+        _ = try await inbox.refresh()
+        server.reply(200, body: Self.mergedByHubot)
+
+        await inbox.describeThreads()
+
+        #expect(inbox.activities["1001"] == GitHub.Activity(
+            asOf: Date(timeIntervalSince1970: 1_794_365_172),
+            state: .merged,
+            event: GitHub.Event(action: .merged, actor: "hubot", date: Fixture.date("2026-11-11T02:40:00Z"), url: URL(string: "https://github.com/octo/app/pull/42#event-hubot"), text: nil)
+        ))
+    }
+
+    @Test func asksAboutTwentyFiveThreadsAtATimeOneQueryAfterAnother() async throws {
+        let inbox = makeInbox()
+        server.reply(200, body: Fixture.page(Self.threads(30)))
+        _ = try await inbox.refresh()
+        let gate = server.replyLater(200, body: Self.answer(describing: 25))
+        server.reply(200, body: Self.answer(describing: 5))
+
+        let describing = Task { await inbox.describeThreads() }
+        await server.waitForRequests(2)
+        for _ in 1...10 { await Task.yield() }
+        #expect(server.requests.count == 2)
+        gate.open()
+        await describing.value
+
+        #expect(try server.requests.dropFirst().map { try variables(of: $0).count } == [75, 15])
+        #expect(inbox.activities.count == 30)
+    }
+
+    @Test func remembersAThreadThatIsNeitherAPullRequestNorAnIssueAsHavingNothingToTellWithoutAsking() async throws {
+        let inbox = makeInbox()
+        server.reply(200, body: Fixture.page(Fixture.checkSuite, Fixture.thread(id: "1003", type: "Release", url: "https://api.github.com/repos/octo/app/releases/3")))
+        _ = try await inbox.refresh()
+
+        await inbox.describeThreads()
+
+        #expect(server.requests.count == 1)
+        #expect(inbox.activities["1002"] == .nothingToTell(asOf: Date(timeIntervalSince1970: 1_794_365_172)))
+        #expect(inbox.activities["1003"] == .nothingToTell(asOf: Date(timeIntervalSince1970: 1_794_365_172)))
+    }
+
+    @Test func asksNothingMoreAboutAThreadWithoutNewActivity() async throws {
+        let inbox = makeInbox()
+        server.reply(200, body: Fixture.page(Fixture.pullRequest))
+        _ = try await inbox.refresh()
+        server.reply(200, body: Self.mergedByHubot)
+        await inbox.describeThreads()
+
+        await inbox.describeThreads()
+
+        #expect(server.requests.count == 2)
+    }
+
+    @Test func describesAThreadAgainOnceItHasNewActivity() async throws {
+        let inbox = makeInbox()
+        server.reply(200, body: Fixture.page(Fixture.pullRequest))
+        _ = try await inbox.refresh()
+        server.reply(200, body: Self.mergedByHubot)
+        await inbox.describeThreads()
+
+        server.reply(200, body: Fixture.page(Fixture.thread(id: "1001", updatedAt: "2026-11-11T03:00:00Z")))
+        _ = try await inbox.refresh()
+        server.reply(200, body: Fixture.answer(Fixture.pullRequest(state: "MERGED", items: Fixture.comment(by: "alice", at: "2026-11-11T03:00:00Z"))))
+        await inbox.describeThreads()
+
+        #expect(inbox.activities["1001"]?.event?.actor == "alice")
+    }
+
+    @Test func stopsDescribingWhenAQueryFailsWholeAndTakesItUpAgainLater() async throws {
+        let inbox = makeInbox()
+        server.reply(200, body: Fixture.page(Self.threads(30)))
+        _ = try await inbox.refresh()
+        server.reply(502)
+
+        await inbox.describeThreads()
+
+        #expect(server.requests.count == 2)
+        #expect(inbox.activities.isEmpty)
+        server.reply(200, body: Self.answer(describing: 25))
+        server.reply(200, body: Self.answer(describing: 5))
+        await inbox.describeThreads()
+        #expect(inbox.activities.count == 30)
+    }
+
+    @Test func goesOnToTheNextQueryWhenSomeThreadsFailedAndAsksAboutThemAgainLater() async throws {
+        let inbox = makeInbox()
+        server.reply(200, body: Fixture.page(Self.threads(30)))
+        _ = try await inbox.refresh()
+        server.reply(200, body: Self.answer(describing: 25, errors: [Fixture.error("FORBIDDEN", at: #"["t0"]"#)]))
+        server.reply(200, body: Self.answer(describing: 5))
+
+        await inbox.describeThreads()
+
+        #expect(inbox.activities.count == 29)
+        #expect(inbox.activities["1"] == nil)
+        server.reply(200, body: Self.answer(describing: 1))
+        await inbox.describeThreads()
+        #expect(try variables(of: try #require(server.requests.last)).count == 3)
+        #expect(inbox.activities["1"] != nil)
+    }
+
+    @Test func describesOnlyTheThreadsItIsAskedAbout() async throws {
+        let inbox = makeInbox()
+        server.reply(200, body: Fixture.page(Fixture.thread(id: "1"), Fixture.thread(id: "2")))
+        _ = try await inbox.refresh()
+        server.reply(200, body: Self.mergedByHubot)
+
+        await inbox.describe([Fixture.notification(Fixture.thread(id: "2"))])
+
+        #expect(inbox.activities.keys.sorted() == ["2"])
+    }
+
+    @Test func asksGitHubOnceAboutAThreadThatIsAskedAboutTwiceAtOnce() async throws {
+        let inbox = makeInbox()
+        server.reply(200, body: Fixture.page(Fixture.pullRequest))
+        _ = try await inbox.refresh()
+        let gate = server.replyLater(200, body: Self.mergedByHubot)
+
+        let first = Task { await inbox.describeThreads() }
+        await server.waitForRequests(2)
+        let second = Task { await inbox.describe([Fixture.notification(Fixture.pullRequest)]) }
+        for _ in 1...10 { await Task.yield() }
+        gate.open()
+        await first.value
+        await second.value
+
+        #expect(server.requests.count == 2)
+        #expect(inbox.activities["1001"]?.state == .merged)
+    }
+
+    @Test func asksNothingAboutAThreadDescribedElsewhereWhileAnEarlierQueryWasUnderway() async throws {
+        let inbox = makeInbox()
+        server.reply(200, body: Fixture.page(Self.threads(26)))
+        _ = try await inbox.refresh()
+        let gate = server.replyLater(200, body: Self.answer(describing: 25))
+        server.reply(200, body: Self.answer(describing: 1))
+
+        let listing = Task { await inbox.describeThreads() }
+        await server.waitForRequests(2)
+        await inbox.describe([Fixture.notification(Fixture.thread(id: "26"))])
+        gate.open()
+        await listing.value
+
+        #expect(server.requests.count == 3)
+        #expect(inbox.activities.count == 26)
+    }
+
+    @Test func anAnswerAboutOlderActivityThatArrivesLastDoesNotReplaceTheNewerOne() async throws {
+        let inbox = makeInbox()
+        server.reply(200, body: Fixture.page(Fixture.pullRequest))
+        _ = try await inbox.refresh()
+        let newer = Fixture.notification(Fixture.thread(id: "1001", updatedAt: "2026-11-11T03:00:00Z"))
+        let gate = server.replyLater(200, body: Self.mergedByHubot)
+        server.reply(200, body: Fixture.answer(Fixture.pullRequest()))
+
+        let older = Task { await inbox.describeThreads() }
+        await server.waitForRequests(2)
+        await inbox.describe([newer])
+        gate.open()
+        await older.value
+
+        #expect(inbox.activities["1001"]?.asOf == newer.updatedAt)
+        #expect(inbox.activities["1001"]?.state == .open)
+    }
+
+    @Test func offersADescriptionOnlyOfTheActivityItDescribes() async throws {
+        let inbox = makeInbox()
+        server.reply(200, body: Fixture.page(Fixture.pullRequest))
+        _ = try await inbox.refresh()
+        server.reply(200, body: Self.mergedByHubot)
+        await inbox.describeThreads()
+
+        let described = Fixture.notification(Fixture.pullRequest)
+        let newer = Fixture.notification(Fixture.thread(id: "1001", updatedAt: "2026-11-11T03:00:00Z"))
+
+        #expect(inbox.activity(describing: described)?.state == .merged)
+        #expect(inbox.activity(describing: newer) == nil)
+    }
+
+    @Test func aThreadReadWhileItIsBeingDescribedIsNoLongerUnread() async throws {
+        let inbox = makeInbox()
+        server.reply(200, body: Fixture.page(Fixture.pullRequest))
+        _ = try await inbox.refresh()
+        let notification = Fixture.notification(Fixture.pullRequest)
+        let gate = server.replyLater(200, body: Self.mergedByHubot)
+        server.reply(205)
+
+        let describing = Task { await inbox.describe([notification]) }
+        await server.waitForRequests(2)
+        await inbox.markAsRead(notification)
+        gate.open()
+        await describing.value
+
+        #expect(!inbox.isUnread(notification))
+    }
+
+    @Test func describingResumesAfterTheNextRefreshEvenWhenTheInboxHasNotChanged() async throws {
+        let inbox = makeInbox()
+        let describing = Task { await inbox.describeAfterEveryRefresh() }
+        defer { describing.cancel() }
+        server.reply(200, headers: ["ETag": #""a""#], body: Fixture.page(Fixture.pullRequest))
+        server.reply(502)
+        _ = try await inbox.refresh()
+        await server.waitForRequests(2)
+
+        server.reply(304)
+        server.reply(200, body: Self.mergedByHubot)
+        _ = try await inbox.refresh()
+        // Bounded, so that a pass that never comes fails the test rather than hanging it.
+        for _ in 1...1_000 where inbox.activities["1001"] == nil {
+            await Task.yield()
+        }
+
+        #expect(inbox.activities["1001"]?.state == .merged)
+    }
+
+    // MARK: - Restoring the last launch
+
+    private static func snapshot(_ threads: String..., activities: [GitHub.Notification.ID: GitHub.Activity] = [:]) -> Snapshot {
+        Snapshot(notifications: threads.map(Fixture.notification), activities: activities)
+    }
+
+    @Test func showsTheRestoredThreadsAndTheirBadgeBeforeGitHubAnswers() {
+        let inbox = makeInbox()
+
+        inbox.restore(Self.snapshot(Fixture.thread(id: "1"), Fixture.thread(id: "2")))
+
+        #expect(inbox.notifications.map(\.id) == ["1", "2"])
+        #expect(inbox.badgeLabel == "2")
+        #expect(!inbox.isLoaded)
+    }
+
+    @Test func replacesTheRestoredThreadsOnlyOnceEveryPageHasArrived() async throws {
+        let inbox = makeInbox()
+        inbox.restore(Self.snapshot(Fixture.thread(id: "1"), Fixture.thread(id: "2"), Fixture.thread(id: "3")))
+        server.reply(200, headers: ["Link": #"<https://api.github.com/notifications?page=2>; rel="next""#], body: Fixture.page(Fixture.thread(id: "4")))
+        let gate = server.replyLater(200, body: Fixture.page(Fixture.thread(id: "1")))
+
+        let refreshing = Task { try await inbox.refresh() }
+        await server.waitForRequests(2)
+
+        #expect(inbox.notifications.map(\.id) == ["1", "2", "3"])
+        gate.open()
+        _ = try await refreshing.value
+        #expect(inbox.notifications.map(\.id) == ["4", "1"])
+    }
+
+    @Test func announcesNothingOnTheFirstRefreshAfterRestoring() async throws {
+        let inbox = makeInbox()
+        inbox.restore(Self.snapshot(Fixture.thread(id: "1")))
+        server.reply(200, body: Fixture.page(Fixture.thread(id: "2"), Fixture.thread(id: "1", updatedAt: "2026-11-11T03:00:00Z")))
+
+        let refresh = try await inbox.refresh()
+
+        #expect(refresh.news.isEmpty)
+    }
+
+    @Test func withdrawsNoDeliveredNotificationOnTheStrengthOfRestoredThreads() {
+        let inbox = makeInbox()
+
+        inbox.restore(Self.snapshot(Fixture.thread(id: "1")))
+
+        #expect(inbox.staleDeliveries([.init(threadID: "2", login: "octo")], for: "octo").isEmpty)
+    }
+
+    @Test func asksNothingAboutAThreadTheRestoredActivityStillDescribes() async {
+        let inbox = makeInbox()
+        let activity = GitHub.Activity(asOf: Date(timeIntervalSince1970: 1_794_365_172), state: .open, event: nil)
+
+        inbox.restore(Self.snapshot(Fixture.pullRequest, activities: ["1001": activity]))
+        await inbox.describeThreads()
+
+        #expect(server.requests.isEmpty)
+        #expect(inbox.activities["1001"] == activity)
+    }
+
+    @Test func offersNothingToSaveUntilLoaded() {
+        let inbox = makeInbox()
+
+        inbox.restore(Self.snapshot(Fixture.thread(id: "1")))
+
+        #expect(inbox.snapshot == nil)
+    }
+
+    @Test func savesTheLoadedThreadsWithTheActivityOfOnlyThoseStillUnread() async throws {
+        let inbox = makeInbox()
+        server.reply(200, body: Fixture.page(Fixture.thread(id: "1"), Fixture.thread(id: "2")))
+        _ = try await inbox.refresh()
+        server.reply(200, body: Self.answer(describing: 2))
+        await inbox.describeThreads()
+
+        server.reply(205)
+        await inbox.markAsRead(Fixture.notification(Fixture.thread(id: "1")))
+
+        let snapshot = try #require(inbox.snapshot)
+        #expect(snapshot.notifications.map(\.id) == ["2"])
+        #expect(snapshot.activities.keys.sorted() == ["2"])
     }
 }
 

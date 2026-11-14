@@ -21,6 +21,7 @@ extension GitHub {
         let id: String
         let reason: String
         let updatedAt: Date
+        let lastReadAt: Date?
         let subject: Subject
         let repository: Repository
 
@@ -50,6 +51,19 @@ extension GitHub {
         private enum CodingKeys: String, CodingKey {
             case id, reason, subject, repository
             case updatedAt = "updated_at"
+            case lastReadAt = "last_read_at"
+        }
+
+        // Where GraphQL finds the subject: GitHub asks integrators not to read structure out of its
+        // URLs, but GraphQL looks a pull request up by its number, which a notification gives
+        // nowhere else. Nil for any other kind of subject, and for a URL that does not end in one.
+        var issueOrPullRequest: (owner: String, name: String, number: Int)? {
+            guard subject.type == "PullRequest" || subject.type == "Issue",
+                  let number = subject.url.flatMap({ Int($0.lastPathComponent) })
+            else { return nil }
+            let parts = repository.fullName.split(separator: "/", maxSplits: 1)
+            guard parts.count == 2 else { return nil }
+            return (String(parts[0]), String(parts[1]), number)
         }
     }
 }

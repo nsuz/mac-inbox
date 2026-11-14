@@ -33,15 +33,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         tasks.append(Task {
             _ = try? await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge])
         })
-        tasks.append(Task { [inbox, poller, announcer] in
+        tasks.append(Task { [inbox, poller, announcer, account] in
+            // Before the first refresh, so that GitHub's answer replaces what was restored rather
+            // than the other way round.
+            if let login = try? await account.resolve(), let snapshot = Snapshot(contentsOf: Snapshot.file(for: login)) {
+                inbox.restore(snapshot)
+            }
             await poller.run {
                 let refresh = try await inbox.refresh()
-                announcer.announce(refresh.news)
+                await announcer.announce(refresh.news)
                 return refresh.pollInterval
             }
         })
         tasks.append(Task { [announcer] in
             await announcer.withdrawWhatIsNoLongerUnread()
+        })
+        tasks.append(Task { [inbox] in
+            await inbox.describeAfterEveryRefresh()
+        })
+        // Saving waits for the account, which may be settled only by `gh auth login` long after
+        // launch. Once settled it stays for the life of the app, so saving never returns.
+        tasks.append(Task { [inbox, account] in
+            for await login in Observations({ account.login }) {
+                guard let login else { continue }
+                await Self.save(inbox, to: Snapshot.file(for: login))
+            }
         })
         // A failed action is told in the window's alert, so the window comes forward whenever one
         // appears, whether it came from the window, a notification or the menu bar.
@@ -74,6 +90,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             guard label != inbox.badgeLabel else { return }
             NSApp.dockTile.badgeLabel = inbox.badgeLabel
             Self.log.notice("Badge set back to \(inbox.badgeLabel ?? "nothing", privacy: .public) over \(label ?? "nothing", privacy: .public)")
+        }
+    }
+
+    // A pause after each write lets the changes made meanwhile go out together: describing an
+    // inbox for the first time changes it once per thread.
+    private static func save(_ inbox: Inbox, to file: URL) async {
+        for await snapshot in Observations({ inbox.snapshot }) {
+            guard let snapshot else { continue }
+            do {
+                try snapshot.write(to: file)
+            } catch {
+                log.error("Couldn’t save the inbox: \(error, privacy: .public)")
+            }
+            try? await Task.sleep(for: .seconds(5))
         }
     }
 
