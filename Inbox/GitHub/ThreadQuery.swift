@@ -17,15 +17,16 @@ extension GitHub {
               ... on PullRequest {
                 pullRequestState: state
                 isDraft
-                timelineItems(last: 3, itemTypes: [ISSUE_COMMENT, PULL_REQUEST_REVIEW, MERGED_EVENT, CLOSED_EVENT, REOPENED_EVENT, READY_FOR_REVIEW_EVENT]) {
-                  nodes { __typename ...Comment ...Review ...Merged ...Closed ...Reopened ...ReadyForReview }
+                viewerLatestReviewRequest { requestedReviewer { ...Reviewer } }
+                timelineItems(last: 3, itemTypes: [ISSUE_COMMENT, PULL_REQUEST_REVIEW, MERGED_EVENT, CLOSED_EVENT, REOPENED_EVENT, READY_FOR_REVIEW_EVENT, REVIEW_REQUESTED_EVENT, ASSIGNED_EVENT]) {
+                  nodes { __typename ...Comment ...Review ...Merged ...Closed ...Reopened ...ReadyForReview ...ReviewRequested ...Assigned }
                 }
               }
               ... on Issue {
                 issueState: state
                 stateReason
-                timelineItems(last: 3, itemTypes: [ISSUE_COMMENT, CLOSED_EVENT, REOPENED_EVENT]) {
-                  nodes { __typename ...Comment ...Closed ...Reopened }
+                timelineItems(last: 3, itemTypes: [ISSUE_COMMENT, CLOSED_EVENT, REOPENED_EVENT, ASSIGNED_EVENT]) {
+                  nodes { __typename ...Comment ...Closed ...Reopened ...Assigned }
                 }
               }
             }
@@ -36,6 +37,9 @@ extension GitHub {
             fragment Closed on ClosedEvent { actor { ...Actor } createdAt url }
             fragment Reopened on ReopenedEvent { actor { ...Actor } createdAt }
             fragment ReadyForReview on ReadyForReviewEvent { actor { ...Actor } createdAt url }
+            fragment ReviewRequested on ReviewRequestedEvent { actor { ...Actor } createdAt requestedReviewer { ...Reviewer } }
+            fragment Assigned on AssignedEvent { actor { ...Actor } createdAt assignee { __typename ... on User { login } } }
+            fragment Reviewer on RequestedReviewer { __typename ... on User { login } ... on Team { slug } }
             """
 
         private let threads: [Notification]
@@ -87,7 +91,7 @@ extension GitHub {
                         activities[thread.id] = .nothingToTell(asOf: thread.updatedAt)
                     }
                 } else if let subject = fields.subjects[alias] {
-                    activities[thread.id] = Activity(asOf: thread.updatedAt, state: subject.state, event: subject.latestEvent(notBy: fields.viewer))
+                    activities[thread.id] = subject.activity(asOf: thread.updatedAt, seenBy: fields.viewer)
                 }
             }
             return activities
@@ -184,7 +188,9 @@ private struct Fields: Decodable {
 
 private struct Subject: Decodable {
     let state: GitHub.SubjectState
-    let events: [GitHub.Event]
+    // Whom the viewer's pending review request was made of: the viewer, or a team the viewer is in.
+    let pendingRequest: Reviewer?
+    let items: [Item]
 
     init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -198,6 +204,7 @@ private struct Subject: Decodable {
             case (_, true): .draft
             default: .open
             }
+            pendingRequest = try container.decodeIfPresent(Request.self, forKey: .viewerLatestReviewRequest)?.requestedReviewer
         case "Issue":
             // An issue closed before GitHub recorded reasons has none, and GitHub shows it as completed.
             let state = try container.decode(String.self, forKey: .issueState)
@@ -208,20 +215,37 @@ private struct Subject: Decodable {
             case (_, "DUPLICATE"): .duplicate
             default: .completed
             }
+            pendingRequest = nil
         case let typename:
             throw DecodingError.dataCorruptedError(forKey: .typename, in: container, debugDescription: "\(typename) is neither a pull request nor an issue")
         }
-        events = try container.decode(Timeline.self, forKey: .timelineItems).nodes.compactMap(\.event)
+        items = try container.decode(Timeline.self, forKey: .timelineItems).nodes
+    }
+
+    // A merged, closed or draft pull request is not waiting for anyone's review, whatever
+    // requests were left on it.
+    func activity(asOf date: Date, seenBy viewer: String) -> GitHub.Activity {
+        GitHub.Activity(
+            asOf: date,
+            state: state,
+            event: latestEvent(seenBy: viewer),
+            awaitsYourReview: state == .open && pendingRequest != nil
+        )
     }
 
     // The latest by time, since GitHub does not document the order it lists them in. A bot's name
     // carries "[bot]", so only the viewer's own doings match the viewer's login.
-    func latestEvent(notBy viewer: String) -> GitHub.Event? {
-        events
+    private func latestEvent(seenBy viewer: String) -> GitHub.Event? {
+        items
+            .compactMap { $0.event(seenBy: viewer, awaitedAs: pendingRequest) }
             .filter { $0.actor != viewer }
             // Merging closes a pull request in the same moment, and the merge is what happened.
             .filter { state != .merged || $0.action != .closed }
             .max { $0.date < $1.date }
+    }
+
+    private struct Request: Decodable {
+        let requestedReviewer: Reviewer?
     }
 
     private struct Timeline: Decodable {
@@ -230,49 +254,88 @@ private struct Subject: Decodable {
 
     private enum CodingKeys: String, CodingKey {
         case typename = "__typename"
-        case pullRequestState, issueState, isDraft, stateReason, timelineItems
+        case pullRequestState, issueState, isDraft, stateReason, viewerLatestReviewRequest, timelineItems
+    }
+}
+
+// Someone asked for a review, or given an issue or pull request to see to.
+private enum Reviewer: Decodable, Equatable {
+    case user(String)
+    case team(String)
+    case other
+
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self = switch try container.decode(String.self, forKey: .typename) {
+        case "User": .user(try container.decode(String.self, forKey: .login))
+        case "Team": .team(try container.decode(String.self, forKey: .slug))
+        default: .other
+        }
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case typename = "__typename"
+        case login, slug
     }
 }
 
 private struct Item: Decodable {
-    // Nil for a review not yet submitted.
-    let event: GitHub.Event?
+    private enum Kind {
+        case done(GitHub.Event.Action)
+        case requestedReview(of: Reviewer?)
+        case assigned(Reviewer?)
+        // A review not yet submitted.
+        case pending
+    }
+
+    private let kind: Kind
+    private let actor: String?
+    private let date: Date?
+    private let url: URL?
+    private let text: String?
 
     init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         let typename = try container.decode(String.self, forKey: .typename)
-        let action: GitHub.Event.Action?
         switch typename {
-        case "IssueComment": action = .commented
+        case "IssueComment": kind = .done(.commented)
         case "PullRequestReview":
-            action = switch try container.decode(String.self, forKey: .state) {
-            case "APPROVED": .approved
-            case "CHANGES_REQUESTED": .requestedChanges
-            case "COMMENTED", "DISMISSED": .reviewed
-            default: nil
+            kind = switch try container.decode(String.self, forKey: .state) {
+            case "APPROVED": .done(.approved)
+            case "CHANGES_REQUESTED": .done(.requestedChanges)
+            case "COMMENTED", "DISMISSED": .done(.reviewed)
+            default: .pending
             }
-        case "MergedEvent": action = .merged
-        case "ClosedEvent": action = .closed
-        case "ReopenedEvent": action = .reopened
-        case "ReadyForReviewEvent": action = .markedReadyForReview
+        case "MergedEvent": kind = .done(.merged)
+        case "ClosedEvent": kind = .done(.closed)
+        case "ReopenedEvent": kind = .done(.reopened)
+        case "ReadyForReviewEvent": kind = .done(.markedReadyForReview)
+        case "ReviewRequestedEvent": kind = .requestedReview(of: try container.decodeIfPresent(Reviewer.self, forKey: .requestedReviewer))
+        case "AssignedEvent": kind = .assigned(try container.decodeIfPresent(Reviewer.self, forKey: .assignee))
         default:
             throw DecodingError.dataCorruptedError(forKey: .typename, in: container, debugDescription: "\(typename) was not asked for")
         }
 
         let isWritten = typename == "IssueComment" || typename == "PullRequestReview"
-        let actor = try container.decodeIfPresent(Actor.self, forKey: isWritten ? .author : .actor)
-        let date = try container.decodeIfPresent(Date.self, forKey: typename == "PullRequestReview" ? .submittedAt : .createdAt)
-        guard let action, let date else {
-            event = nil
-            return
+        actor = try container.decodeIfPresent(Actor.self, forKey: isWritten ? .author : .actor)?.name
+        date = try container.decodeIfPresent(Date.self, forKey: typename == "PullRequestReview" ? .submittedAt : .createdAt)
+        url = try container.decodeIfPresent(URL.self, forKey: .url)
+        text = isWritten ? try container.decode(String.self, forKey: .bodyText) : nil
+    }
+
+    // A request or an assignment counts only when it falls to the viewer; one made of someone
+    // else gives the viewer nothing to do, like a label. A team counts while the viewer is still
+    // awaited as one of it.
+    func event(seenBy viewer: String, awaitedAs pendingRequest: Reviewer?) -> GitHub.Event? {
+        let action: GitHub.Event.Action? = switch kind {
+        case let .done(action): action
+        case .requestedReview(of: .user(viewer)?): .requestedYourReview
+        case let .requestedReview(of: team?) where team == pendingRequest: .requestedYourTeamsReview
+        case .assigned(.user(viewer)?): .assignedYou
+        case .requestedReview, .assigned, .pending: nil
         }
-        event = GitHub.Event(
-            action: action,
-            actor: actor?.name,
-            date: date,
-            url: try container.decodeIfPresent(URL.self, forKey: .url),
-            text: isWritten ? try container.decode(String.self, forKey: .bodyText) : nil
-        )
+        guard let action, let date else { return nil }
+        return GitHub.Event(action: action, actor: actor, date: date, url: url, text: text)
     }
 
     private struct Actor: Decodable {
@@ -292,6 +355,6 @@ private struct Item: Decodable {
 
     private enum CodingKeys: String, CodingKey {
         case typename = "__typename"
-        case author, actor, createdAt, submittedAt, state, bodyText, url
+        case author, actor, createdAt, submittedAt, state, bodyText, url, requestedReviewer, assignee
     }
 }

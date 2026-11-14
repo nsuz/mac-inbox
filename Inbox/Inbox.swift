@@ -122,7 +122,7 @@ final class Inbox {
     // whatever is left.
     func describe(_ threads: [GitHub.Notification]) async {
         var askable: [GitHub.Notification] = []
-        for notification in threads where !isDescribed(notification) {
+        for notification in threads where needsDescribing(notification) {
             if notification.issueOrPullRequest == nil {
                 record(.nothingToTell(asOf: notification.updatedAt), for: notification.id)
             } else {
@@ -138,8 +138,9 @@ final class Inbox {
     // A thread is asked about from the list and from a banner at once; the second waits for the
     // first answer rather than asking GitHub again. False when a query failed whole.
     private func describe(batch threads: [GitHub.Notification]) async -> Bool {
-        // Some may have been described from elsewhere while an earlier query was awaited.
-        let threads = threads.filter { !isDescribed($0) }
+        // Some may have been described from elsewhere while an earlier query was awaited. An open
+        // pull request is asked about again even so; it is one thread among a few dozen.
+        let threads = threads.filter(needsDescribing)
         let pending = Set(threads.compactMap { descriptions[$0] })
         let unasked = threads.filter { descriptions[$0] == nil }
         var described = true
@@ -171,14 +172,20 @@ final class Inbox {
         }
     }
 
-    // As the thread is now, or as it has been since: a banner may have asked about newer activity.
-    private func isDescribed(_ notification: GitHub.Notification) -> Bool {
-        activities[notification.id].map { $0.asOf >= notification.updatedAt } ?? false
+    // Not yet described as the thread is now, or as it has been since (a banner may have asked
+    // about newer activity). What was done on a thread stays as it was described, but whether the
+    // viewer's review is awaited can change without the thread being updated, so an open or draft
+    // pull request is described again every time.
+    private func needsDescribing(_ notification: GitHub.Notification) -> Bool {
+        guard let activity = activities[notification.id], activity.asOf >= notification.updatedAt else { return true }
+        return notification.subject.type == "PullRequest" && (activity.state == .open || activity.state == .draft)
     }
 
-    // An answer about older activity can arrive after one about newer activity.
+    // An answer about older activity can arrive after one about newer activity. An answer that
+    // tells nothing new leaves the description alone, or every pass would count as a change and
+    // write the snapshot again.
     private func record(_ activity: GitHub.Activity, for id: GitHub.Notification.ID) {
-        if activities[id].map({ $0.asOf <= activity.asOf }) ?? true {
+        if activities[id].map({ $0.asOf <= activity.asOf && $0 != activity }) ?? true {
             activities[id] = activity
         }
     }

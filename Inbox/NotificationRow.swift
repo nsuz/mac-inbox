@@ -21,6 +21,14 @@ struct NotificationRow: View {
                         Text(event.phrase)
                             .layoutPriority(-1)
                     }
+                    // Marked beside the reason rather than worded in its place, which would hide why
+                    // the thread came in. In the line's own colour: the accent made it louder than the
+                    // title.
+                    if activity?.awaitsYourReview == true {
+                        Image(systemName: "person.badge.clock")
+                            .help("Waiting for your review")
+                            .accessibilityLabel("Waiting for your review")
+                    }
                     Spacer()
                     Text(notification.updatedAt, format: .relative(presentation: .named))
                 }
@@ -138,6 +146,9 @@ extension GitHub.Event {
         case .closed: "\(actorName) closed"
         case .reopened: "\(actorName) reopened"
         case .markedReadyForReview: "\(actorName) marked this ready for review"
+        case .requestedYourReview: "\(actorName) requested your review"
+        case .requestedYourTeamsReview: "\(actorName) requested your team’s review"
+        case .assignedYou: "\(actorName) assigned you"
         }
     }
 }

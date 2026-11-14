@@ -10,7 +10,7 @@ struct SnapshotTests {
         let event = GitHub.Event(action: .approved, actor: "hubot", date: pullRequest.updatedAt, url: URL(string: "https://github.com/octo/app/pull/42#pullrequestreview-9"), text: nil)
         let snapshot = Snapshot(
             notifications: [pullRequest, Fixture.notification(Fixture.checkSuite)],
-            activities: [pullRequest.id: GitHub.Activity(asOf: pullRequest.updatedAt, state: .merged, event: event)]
+            activities: [pullRequest.id: GitHub.Activity(asOf: pullRequest.updatedAt, state: .merged, event: event, awaitsYourReview: true)]
         )
 
         try snapshot.write(to: file)
@@ -21,7 +21,7 @@ struct SnapshotTests {
     @Test func keepsNoWordsOfCommentsOrReviewsOnDisk() throws {
         let pullRequest = Fixture.notification(Fixture.pullRequest)
         let event = GitHub.Event(action: .commented, actor: "hubot", date: pullRequest.updatedAt, url: nil, text: "Looks good")
-        let activity = GitHub.Activity(asOf: pullRequest.updatedAt, state: nil, event: event)
+        let activity = GitHub.Activity(asOf: pullRequest.updatedAt, state: nil, event: event, awaitsYourReview: false)
 
         try Snapshot(notifications: [pullRequest], activities: [pullRequest.id: activity]).write(to: file)
 
@@ -47,6 +47,7 @@ struct SnapshotTests {
     @Test(arguments: [
         #"{"notifications":[],"activities":{}}"#,
         #"{"format":1,"notifications":[],"activities":{}}"#,
+        #"{"format":2,"notifications":[],"activities":{}}"#,
     ])
     func readsNothingFromAFileOfAnotherFormat(json: String) throws {
         try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)

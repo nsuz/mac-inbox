@@ -12,10 +12,13 @@ extension GitHub {
         let state: SubjectState?
         // The latest thing someone other than the viewer did, among the few things looked at.
         let event: Event?
+        // Whether the viewer is asked for a review of an open pull request, now rather than as of
+        // `asOf`: a request can be withdrawn or fulfilled without the thread being updated.
+        let awaitsYourReview: Bool
 
         // For a thread whose subject is gone, and for one that is not a pull request or an issue.
         static func nothingToTell(asOf: Date) -> Self {
-            Self(asOf: asOf, state: nil, event: nil)
+            Self(asOf: asOf, state: nil, event: nil, awaitsYourReview: false)
         }
 
         func unreadEvent(lastReadAt: Date?) -> Event? {
@@ -27,6 +30,7 @@ extension GitHub {
     struct Event: Codable, Hashable {
         enum Action: String, Codable {
             case commented, approved, requestedChanges, reviewed, merged, closed, reopened, markedReadyForReview
+            case requestedYourReview, requestedYourTeamsReview, assignedYou
         }
 
         let action: Action

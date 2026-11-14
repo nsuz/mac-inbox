@@ -374,7 +374,7 @@ struct ClientTests {
     func tellsWhereAPullRequestStands(state: String, isDraft: Bool, expected: GitHub.SubjectState) async throws {
         let activities = try await describe(pullRequest, answer: Fixture.answer(Fixture.pullRequest(state: state, isDraft: isDraft)))
 
-        #expect(activities[pullRequest.id] == GitHub.Activity(asOf: pullRequest.updatedAt, state: expected, event: nil))
+        #expect(activities[pullRequest.id] == GitHub.Activity(asOf: pullRequest.updatedAt, state: expected, event: nil, awaitsYourReview: false))
     }
 
     // An issue closed before GitHub recorded reasons has none, and GitHub shows it as completed.
@@ -429,7 +429,7 @@ struct ClientTests {
 
         let activities = try await describe(pullRequest, answer: answer)
 
-        #expect(activities[pullRequest.id] == GitHub.Activity(asOf: pullRequest.updatedAt, state: .open, event: nil))
+        #expect(activities[pullRequest.id] == GitHub.Activity(asOf: pullRequest.updatedAt, state: .open, event: nil, awaitsYourReview: false))
     }
 
     // The two come at the same second, in whichever order.
@@ -492,6 +492,77 @@ struct ClientTests {
         #expect(closed[issue.id]?.event?.text == nil)
     }
 
+    @Test func asksWhetherTheViewersReviewIsAwaitedAndForRequestsAndAssignments() async throws {
+        _ = try await describe(pullRequest, answer: Fixture.answer(Fixture.pullRequest()))
+
+        let body = try #require(try server.requests.first?.httpBody.flatMap { try JSONSerialization.jsonObject(with: $0) as? [String: Any] })
+        let query = try #require(body["query"] as? String)
+        #expect(query.contains("viewerLatestReviewRequest"))
+        #expect(query.contains("REVIEW_REQUESTED_EVENT"))
+        #expect(query.contains("ASSIGNED_EVENT"))
+    }
+
+    @Test func tellsOfAReviewRequestedOfTheViewer() async throws {
+        let answer = Fixture.answer(viewer: "octocat", Fixture.pullRequest(awaiting: Fixture.user("octocat"), items:
+            Fixture.reviewRequested(by: "alice", of: Fixture.user("octocat"), at: "2026-11-11T02:00:00Z")
+        ))
+
+        let event = try #require(try await describe(pullRequest, answer: answer)[pullRequest.id]?.event)
+
+        #expect(event.action == .requestedYourReview)
+        #expect(event.actor == "alice")
+        #expect(event.url == nil)
+    }
+
+    @Test func tellsOfAReviewRequestedOfTheTeamTheViewerIsAwaitedAs() async throws {
+        let answer = Fixture.answer(Fixture.pullRequest(awaiting: Fixture.team("app"), items:
+            Fixture.reviewRequested(by: "alice", of: Fixture.team("app"), at: "2026-11-11T02:00:00Z")
+        ))
+
+        let activities = try await describe(pullRequest, answer: answer)
+
+        #expect(activities[pullRequest.id]?.event?.action == .requestedYourTeamsReview)
+    }
+
+    @Test func tellsOfAnAssignmentOfTheViewer() async throws {
+        let answer = Fixture.answer(viewer: "octocat", Fixture.issue(items: Fixture.assigned(by: "alice", to: "octocat", at: "2026-11-11T02:00:00Z")))
+
+        let event = try #require(try await describe(issue, answer: answer)[issue.id]?.event)
+
+        #expect(event.action == .assignedYou)
+        #expect(event.url == nil)
+    }
+
+    // Asking someone else, or a team the viewer is not awaited as, gives the viewer nothing to do.
+    @Test func countsNoRequestOrAssignmentOfSomeoneElse() async throws {
+        let answer = Fixture.answer(viewer: "octocat", Fixture.pullRequest(awaiting: Fixture.team("app"), items:
+            Fixture.comment(by: "bob", at: "2026-11-11T02:00:00Z"),
+            Fixture.reviewRequested(by: "alice", of: Fixture.user("carol"), at: "2026-11-11T02:10:00Z"),
+            Fixture.reviewRequested(by: "alice", of: Fixture.team("infra"), at: "2026-11-11T02:10:00Z"),
+            Fixture.assigned(by: "alice", to: "carol", at: "2026-11-11T02:20:00Z")
+        ))
+
+        let activities = try await describe(pullRequest, answer: answer)
+
+        #expect(activities[pullRequest.id]?.event?.actor == "bob")
+    }
+
+    @Test(arguments: [
+        ("OPEN", false, Fixture.user("octocat"), true),
+        ("OPEN", false, Fixture.team("app"), true),
+        ("OPEN", false, nil, false),
+        ("OPEN", true, Fixture.user("octocat"), false),
+        ("MERGED", false, Fixture.user("octocat"), false),
+        ("CLOSED", false, Fixture.user("octocat"), false),
+    ])
+    func awaitsTheViewersReviewOnlyOnAnOpenPullRequestWithTheRequestStillPending(state: String, isDraft: Bool, reviewer: String?, awaits: Bool) async throws {
+        let answer = Fixture.answer(viewer: "octocat", Fixture.pullRequest(state: state, isDraft: isDraft, awaiting: reviewer))
+
+        let activities = try await describe(pullRequest, answer: answer)
+
+        #expect(activities[pullRequest.id]?.awaitsYourReview == awaits)
+    }
+
     // A missing repository comes back as null in its place, a missing subject as null inside it.
     @Test(arguments: [
         (nil, #"["t1"]"#),
@@ -503,7 +574,7 @@ struct ClientTests {
         let activities = try await describe(pullRequest, issue, answer: answer)
 
         #expect(activities[pullRequest.id]?.state == .open)
-        #expect(activities[issue.id] == GitHub.Activity(asOf: issue.updatedAt, state: nil, event: nil))
+        #expect(activities[issue.id] == GitHub.Activity(asOf: issue.updatedAt, state: nil, event: nil, awaitsYourReview: false))
     }
 
     @Test func leavesAThreadUndescribedWhenItFailsForAnyOtherReason() async throws {
@@ -558,8 +629,10 @@ extension Fixture {
         return #"{"data":{"viewer":{"login":"\#(viewer)"}\#(fields.joined())}\#(errors)}"#
     }
 
-    static func pullRequest(state: String = "OPEN", isDraft: Bool = false, items: String...) -> String {
-        #"{"__typename":"PullRequest","pullRequestState":"\#(state)","isDraft":\#(isDraft),"timelineItems":{"nodes":[\#(items.joined(separator: ","))]}}"#
+    // `awaiting` is who the viewer's pending review request was made of, if there is one.
+    static func pullRequest(state: String = "OPEN", isDraft: Bool = false, awaiting reviewer: String? = nil, items: String...) -> String {
+        let request = reviewer.map { #"{"requestedReviewer":\#($0)}"# } ?? "null"
+        return #"{"__typename":"PullRequest","pullRequestState":"\#(state)","isDraft":\#(isDraft),"viewerLatestReviewRequest":\#(request),"timelineItems":{"nodes":[\#(items.joined(separator: ","))]}}"#
     }
 
     static func issue(state: String = "OPEN", stateReason: String? = nil, items: String...) -> String {
@@ -577,6 +650,22 @@ extension Fixture {
 
     nonisolated static func event(_ type: String, by login: String, at time: String) -> String {
         #"{"__typename":"\#(type)","actor":\#(actor(login, "User")),"createdAt":"\#(time)","url":"https://github.com/octo/app/pull/42#event-\#(login)"}"#
+    }
+
+    nonisolated static func reviewRequested(by login: String, of reviewer: String, at time: String) -> String {
+        #"{"__typename":"ReviewRequestedEvent","actor":\#(actor(login, "User")),"createdAt":"\#(time)","requestedReviewer":\#(reviewer)}"#
+    }
+
+    nonisolated static func assigned(by login: String, to assignee: String, at time: String) -> String {
+        #"{"__typename":"AssignedEvent","actor":\#(actor(login, "User")),"createdAt":"\#(time)","assignee":\#(user(assignee))}"#
+    }
+
+    nonisolated static func user(_ login: String) -> String {
+        #"{"__typename":"User","login":"\#(login)"}"#
+    }
+
+    nonisolated static func team(_ slug: String) -> String {
+        #"{"__typename":"Team","slug":"\#(slug)"}"#
     }
 
     static func error(_ type: String, at path: String) -> String {

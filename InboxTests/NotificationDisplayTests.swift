@@ -105,6 +105,9 @@ struct NotificationDisplayTests {
         (.closed, "alice closed"),
         (.reopened, "alice reopened"),
         (.markedReadyForReview, "alice marked this ready for review"),
+        (.requestedYourReview, "alice requested your review"),
+        (.requestedYourTeamsReview, "alice requested your team’s review"),
+        (.assignedYou, "alice assigned you"),
     ])
     func saysWhoDidWhat(action: GitHub.Event.Action, phrase: String) {
         #expect(GitHub.Event(action: action, actor: "alice", date: .now, url: nil, text: nil).phrase == phrase)
@@ -117,7 +120,7 @@ struct NotificationDisplayTests {
     private static let lastRead = Date(timeIntervalSince1970: 1_794_362_400)
 
     private static func activity(eventAt date: Date) -> GitHub.Activity {
-        GitHub.Activity(asOf: date, state: nil, event: GitHub.Event(action: .approved, actor: "hubot", date: date, url: nil, text: nil))
+        GitHub.Activity(asOf: date, state: nil, event: GitHub.Event(action: .approved, actor: "hubot", date: date, url: nil, text: nil), awaitsYourReview: false)
     }
 
     @Test func tellsOfAnEventSinceTheThreadWasLastRead() {

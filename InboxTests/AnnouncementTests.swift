@@ -23,7 +23,7 @@ struct AnnouncementTests {
     }
 
     private func content(of notification: GitHub.Notification, state: GitHub.SubjectState? = .open, event: GitHub.Event?) -> UNNotificationContent {
-        let activity = GitHub.Activity(asOf: notification.updatedAt, state: state, event: event)
+        let activity = GitHub.Activity(asOf: notification.updatedAt, state: state, event: event, awaitsYourReview: false)
         return Announcement.request(for: notification, activity: activity, login: "octo").content
     }
 

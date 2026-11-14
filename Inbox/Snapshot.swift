@@ -6,7 +6,7 @@ struct Snapshot: Codable, Equatable {
     // Raised whenever what is written changes shape. A file from an earlier version may still
     // decode, with whatever it lacks read as nothing; its threads would then look described and
     // never be asked about again.
-    private static let currentFormat = 2
+    private static let currentFormat = 3
 
     private var format = Self.currentFormat
     let notifications: [GitHub.Notification]

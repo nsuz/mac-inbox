@@ -1,4 +1,5 @@
 import Foundation
+import Synchronization
 import Testing
 @testable import Inbox
 
@@ -455,8 +456,9 @@ struct InboxTests {
         (1...count).map { Fixture.thread(id: String($0)) }
     }
 
+    // Merged, so that nothing about them can change without new activity.
     private static func answer(describing count: Int, errors: [String] = []) -> String {
-        Fixture.answer(subjects: Array(repeating: Fixture.pullRequest(), count: count), errors: errors)
+        Fixture.answer(subjects: Array(repeating: Fixture.pullRequest(state: "MERGED"), count: count), errors: errors)
     }
 
     private func variables(of request: URLRequest) throws -> [String: Any] {
@@ -475,7 +477,8 @@ struct InboxTests {
         #expect(inbox.activities["1001"] == GitHub.Activity(
             asOf: Date(timeIntervalSince1970: 1_794_365_172),
             state: .merged,
-            event: GitHub.Event(action: .merged, actor: "hubot", date: Fixture.date("2026-11-11T02:40:00Z"), url: URL(string: "https://github.com/octo/app/pull/42#event-hubot"), text: nil)
+            event: GitHub.Event(action: .merged, actor: "hubot", date: Fixture.date("2026-11-11T02:40:00Z"), url: URL(string: "https://github.com/octo/app/pull/42#event-hubot"), text: nil),
+            awaitsYourReview: false
         ))
     }
 
@@ -509,16 +512,83 @@ struct InboxTests {
         #expect(inbox.activities["1003"] == .nothingToTell(asOf: Date(timeIntervalSince1970: 1_794_365_172)))
     }
 
-    @Test func asksNothingMoreAboutAThreadWithoutNewActivity() async throws {
+    // Nothing about a merged or closed pull request or about an issue changes without new activity.
+    @Test(arguments: [
+        ("PullRequest", "MERGED"),
+        ("PullRequest", "CLOSED"),
+        ("Issue", "OPEN"),
+    ])
+    func asksNothingMoreAboutASettledThreadWithoutNewActivity(type: String, state: String) async throws {
         let inbox = makeInbox()
-        server.reply(200, body: Fixture.page(Fixture.pullRequest))
+        let thread = Fixture.thread(id: "1001", type: type, url: "https://api.github.com/repos/octo/app/issues/9")
+        server.reply(200, body: Fixture.page(thread))
         _ = try await inbox.refresh()
-        server.reply(200, body: Self.mergedByHubot)
+        server.reply(200, body: Fixture.answer(type == "Issue" ? Fixture.issue(state: state) : Fixture.pullRequest(state: state)))
         await inbox.describeThreads()
 
         await inbox.describeThreads()
 
         #expect(server.requests.count == 2)
+    }
+
+    // Whether the viewer's review is awaited can change without the thread being updated.
+    @Test(arguments: [false, true])
+    func asksAgainAboutAnOpenOrDraftPullRequestWithoutNewActivity(isDraft: Bool) async throws {
+        let inbox = makeInbox()
+        server.reply(200, body: Fixture.page(Fixture.pullRequest))
+        _ = try await inbox.refresh()
+        server.reply(200, body: Fixture.answer(Fixture.pullRequest(isDraft: isDraft)))
+        await inbox.describeThreads()
+
+        server.reply(200, body: Fixture.answer(Fixture.pullRequest(isDraft: isDraft)))
+        await inbox.describeThreads()
+
+        #expect(server.requests.count == 3)
+    }
+
+    @Test func learnsThatTheViewersReviewIsNoLongerAwaitedWithoutNewActivity() async throws {
+        let inbox = makeInbox()
+        server.reply(200, body: Fixture.page(Fixture.pullRequest))
+        _ = try await inbox.refresh()
+        server.reply(200, body: Fixture.answer(Fixture.pullRequest(awaiting: Fixture.user("octocat"))))
+        await inbox.describeThreads()
+        #expect(inbox.activities["1001"]?.awaitsYourReview == true)
+
+        server.reply(200, body: Fixture.answer(Fixture.pullRequest()))
+        await inbox.describeThreads()
+
+        #expect(inbox.activities["1001"]?.awaitsYourReview == false)
+    }
+
+    @Test func learnsThatTheViewersReviewIsAwaitedOnceADraftIsReadyWithoutNewActivity() async throws {
+        let inbox = makeInbox()
+        server.reply(200, body: Fixture.page(Fixture.pullRequest))
+        _ = try await inbox.refresh()
+        server.reply(200, body: Fixture.answer(Fixture.pullRequest(isDraft: true, awaiting: Fixture.user("octocat"))))
+        await inbox.describeThreads()
+        #expect(inbox.activities["1001"]?.awaitsYourReview == false)
+
+        server.reply(200, body: Fixture.answer(Fixture.pullRequest(awaiting: Fixture.user("octocat"))))
+        await inbox.describeThreads()
+
+        #expect(inbox.activities["1001"]?.awaitsYourReview == true)
+    }
+
+    // Replacing it with its equal would count as a change, and the snapshot would be written again.
+    @Test func leavesTheDescriptionAloneWhenAskingAgainTellsNothingNew() async throws {
+        let inbox = makeInbox()
+        server.reply(200, body: Fixture.page(Fixture.pullRequest))
+        _ = try await inbox.refresh()
+        server.reply(200, body: Fixture.answer(Fixture.pullRequest()))
+        await inbox.describeThreads()
+        let changed = Mutex(false)
+        withObservationTracking { _ = inbox.activities } onChange: { changed.withLock { $0 = true } }
+
+        server.reply(200, body: Fixture.answer(Fixture.pullRequest()))
+        await inbox.describeThreads()
+
+        #expect(server.requests.count == 3)
+        #expect(!changed.withLock { $0 })
     }
 
     @Test func describesAThreadAgainOnceItHasNewActivity() async throws {
@@ -735,13 +805,24 @@ struct InboxTests {
 
     @Test func asksNothingAboutAThreadTheRestoredActivityStillDescribes() async {
         let inbox = makeInbox()
-        let activity = GitHub.Activity(asOf: Date(timeIntervalSince1970: 1_794_365_172), state: .open, event: nil)
+        let activity = GitHub.Activity(asOf: Date(timeIntervalSince1970: 1_794_365_172), state: .merged, event: nil, awaitsYourReview: false)
 
         inbox.restore(Self.snapshot(Fixture.pullRequest, activities: ["1001": activity]))
         await inbox.describeThreads()
 
         #expect(server.requests.isEmpty)
         #expect(inbox.activities["1001"] == activity)
+    }
+
+    @Test func asksAgainAboutARestoredOpenPullRequest() async {
+        let inbox = makeInbox()
+        let activity = GitHub.Activity(asOf: Date(timeIntervalSince1970: 1_794_365_172), state: .open, event: nil, awaitsYourReview: true)
+        inbox.restore(Self.snapshot(Fixture.pullRequest, activities: ["1001": activity]))
+        server.reply(200, body: Fixture.answer(Fixture.pullRequest()))
+
+        await inbox.describeThreads()
+
+        #expect(inbox.activities["1001"]?.awaitsYourReview == false)
     }
 
     @Test func offersNothingToSaveUntilLoaded() {
