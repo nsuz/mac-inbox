@@ -14,8 +14,14 @@ struct AnnouncementTests {
         let content = Announcement.request(for: notification, activity: nil, login: "octo", locale: .english).content
 
         #expect(content.title == "Fix popup position")
-        #expect(content.subtitle == "octo/app · Review requested")
+        #expect(content.subtitle == "octo/app #42 · Review requested")
         #expect(content.body == "")
+    }
+
+    @Test func saysOnlyTheRepositoryOfAThreadWithoutANumber() {
+        let checkSuite = Fixture.notification(Fixture.checkSuite)
+
+        #expect(Announcement.request(for: checkSuite, activity: nil, login: "octo", locale: .english).content.subtitle == "octo/app · Workflow run")
     }
 
     private func event(_ action: GitHub.Event.Action, saying text: String? = nil) -> GitHub.Event {

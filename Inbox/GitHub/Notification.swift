@@ -54,13 +54,22 @@ extension GitHub {
             case lastReadAt = "last_read_at"
         }
 
-        // Where GraphQL finds the subject: GitHub asks integrators not to read structure out of its
-        // URLs, but GraphQL looks a pull request up by its number, which a notification gives
-        // nowhere else. Nil for any other kind of subject, and for a URL that does not end in one.
+        // GitHub asks integrators not to read structure out of its URLs, but a notification gives a
+        // pull request's or an issue's number nowhere else. Nil for any other kind of subject, and
+        // for a URL that does not end in one.
+        var number: Int? {
+            guard subject.type == "PullRequest" || subject.type == "Issue" else { return nil }
+            return subject.url.flatMap { Int($0.lastPathComponent) }
+        }
+
+        // As GitHub's own inbox names a thread.
+        var reference: String {
+            number.map { "\(repository.fullName) #\($0)" } ?? repository.fullName
+        }
+
+        // Where GraphQL finds the subject, which it looks up by number.
         var issueOrPullRequest: (owner: String, name: String, number: Int)? {
-            guard subject.type == "PullRequest" || subject.type == "Issue",
-                  let number = subject.url.flatMap({ Int($0.lastPathComponent) })
-            else { return nil }
+            guard let number else { return nil }
             let parts = repository.fullName.split(separator: "/", maxSplits: 1)
             guard parts.count == 2 else { return nil }
             return (String(parts[0]), String(parts[1]), number)

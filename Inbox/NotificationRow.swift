@@ -12,7 +12,7 @@ struct NotificationRow: View {
                 Text(notification.subject.title)
                     .lineLimit(2)
                 HStack(spacing: 4) {
-                    Text(notification.repository.fullName)
+                    Text(notification.reference)
                     Text(verbatim: "·")
                     Text(GitHub.Notification.describe(reason: notification.reason, type: notification.subject.type))
                     if let event = activity?.unreadEvent(lastReadAt: notification.lastReadAt) {

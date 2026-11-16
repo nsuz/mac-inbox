@@ -56,6 +56,22 @@ struct NotificationTests {
     func findsNoPullRequestOrIssueBehindAnyOtherThread(type: String, url: String?) {
         #expect(Fixture.notification(Fixture.thread(id: "1", type: type, url: url)).issueOrPullRequest == nil)
     }
+
+    @Test(arguments: [
+        ("PullRequest", "https://api.github.com/repos/octo/app/pulls/42", "octo/app #42"),
+        ("Issue", "https://api.github.com/repos/octo/app/issues/9", "octo/app #9"),
+    ])
+    func refersToAPullRequestOrAnIssueByItsRepositoryAndNumber(type: String, url: String, reference: String) {
+        #expect(Fixture.notification(Fixture.thread(id: "1", type: type, url: url)).reference == reference)
+    }
+
+    @Test(arguments: [
+        ("Release", "https://api.github.com/repos/octo/app/releases/3"),
+        ("CheckSuite", nil),
+    ])
+    func refersToAnyOtherThreadByItsRepositoryAlone(type: String, url: String?) {
+        #expect(Fixture.notification(Fixture.thread(id: "1", type: type, url: url)).reference == "octo/app")
+    }
 }
 
 enum Fixture {

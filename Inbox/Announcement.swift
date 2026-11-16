@@ -25,7 +25,7 @@ struct Announcement {
         let content = UNMutableNotificationContent()
         content.title = notification.subject.title
         let reason = GitHub.Notification.describe(reason: notification.reason, type: notification.subject.type)
-        content.subtitle = "\(notification.repository.fullName) · \(reason.resolved(in: locale))"
+        content.subtitle = "\(notification.reference) · \(reason.resolved(in: locale))"
         content.body = event.map { news($0, in: locale) } ?? ""
         content.threadIdentifier = notification.repository.fullName
         content.categoryIdentifier = categoryIdentifier

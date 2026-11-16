@@ -25,7 +25,7 @@ struct MenuContent: View {
                 Task { await inbox.open(notification) }
             } label: {
                 Text(notification.subject.title)
-                Text(notification.repository.fullName)
+                Text(notification.reference)
             }
         }
         if !inbox.shown.isEmpty {
