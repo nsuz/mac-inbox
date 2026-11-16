@@ -74,6 +74,27 @@ struct AnnouncementTests {
         #expect(try #require(Announcement(userInfo: userInfo)).event == nil)
     }
 
+    @Test func offersToMarkAThreadAsReadWithoutOpeningIt() throws {
+        let action = try #require(Announcement.category(locale: .english).actions.only)
+
+        #expect(action.identifier == Announcement.markAsReadIdentifier)
+        #expect(action.title == "Mark as Read")
+        #expect(!action.options.contains(.foreground))
+    }
+
+    @Test func namesTheActionInJapanese() throws {
+        #expect(try #require(Announcement.category(locale: .japanese).actions.only).title == "既読にする")
+    }
+
+    @Test(arguments: [
+        (UNNotificationDefaultActionIdentifier, Announcement.Reply.open),
+        (Announcement.markAsReadIdentifier, .markAsRead),
+        (UNNotificationDismissActionIdentifier, nil),
+    ])
+    func tellsAClickFromAPressOfMarkAsRead(actionIdentifier: String, reply: Announcement.Reply?) {
+        #expect(Announcement.Reply(actionIdentifier: actionIdentifier) == reply)
+    }
+
     @Test func groupsNotificationsByRepositoryAndHidesDetailsWhenPreviewsAreOff() {
         let content = Announcement.request(for: notification, activity: nil, login: "octo", locale: .english).content
 
@@ -108,4 +129,8 @@ struct AnnouncementTests {
 
         #expect(event.excerpt == excerpt)
     }
+}
+
+private extension Array {
+    var only: Element? { count == 1 ? first : nil }
 }

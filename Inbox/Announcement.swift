@@ -8,14 +8,34 @@ struct Announcement {
     let event: URL?
 
     static let categoryIdentifier = "thread"
+    nonisolated static let markAsReadIdentifier = "markAsRead"
 
+    // No action to open the thread: a click already does that.
     static func category(locale: Locale = .current) -> UNNotificationCategory {
-        UNNotificationCategory(
+        let markAsRead = UNNotificationAction(
+            identifier: markAsReadIdentifier,
+            title: LocalizedStringResource("Mark as Read").resolved(in: locale),
+            icon: UNNotificationActionIcon(systemImageName: "envelope.open")
+        )
+        return UNNotificationCategory(
             identifier: categoryIdentifier,
-            actions: [],
+            actions: [markAsRead],
             intentIdentifiers: [],
             hiddenPreviewsBodyPlaceholder: LocalizedStringResource("New activity").resolved(in: locale)
         )
+    }
+
+    nonisolated enum Reply {
+        case open
+        case markAsRead
+
+        init?(actionIdentifier: String) {
+            switch actionIdentifier {
+            case UNNotificationDefaultActionIdentifier: self = .open
+            case Announcement.markAsReadIdentifier: self = .markAsRead
+            default: return nil
+            }
+        }
     }
 
     // The event is carried in the notification, since by the time it is clicked the description

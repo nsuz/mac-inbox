@@ -60,7 +60,9 @@ final class Announcer: NSObject {
         }
     }
 
-    private func respond(login: String?, thread: Data?, event: String?) async {
+    // A thread of another account opens GitHub's inbox, where whoever is signed in there can
+    // deal with it: the token Inbox holds can neither find it nor mark it as read.
+    private func respond(_ reply: Announcement.Reply, login: String?, thread: Data?, event: String?) async {
         guard let announcement = Announcement(login: login, thread: thread, event: event) else {
             NSWorkspace.shared.open(GitHub.inbox)
             return
@@ -70,9 +72,15 @@ final class Announcer: NSObject {
                 NSWorkspace.shared.open(GitHub.inbox)
                 return
             }
-            await inbox.open(announcement.notification, at: announcement.event)
+            switch reply {
+            case .open: await inbox.open(announcement.notification, at: announcement.event)
+            case .markAsRead: await inbox.markAsRead(announcement.notification)
+            }
         } catch {
-            inbox.reportFailure(error, opening: announcement.notification)
+            switch reply {
+            case .open: inbox.reportFailure(error, opening: announcement.notification)
+            case .markAsRead: inbox.reportFailure(error, markingAsRead: announcement.notification)
+            }
         }
     }
 }
@@ -91,8 +99,8 @@ extension Announcer: UNUserNotificationCenterDelegate {
         _ center: UNUserNotificationCenter,
         didReceive response: UNNotificationResponse
     ) async {
-        guard response.actionIdentifier == UNNotificationDefaultActionIdentifier else { return }
+        guard let reply = Announcement.Reply(actionIdentifier: response.actionIdentifier) else { return }
         let userInfo = response.notification.request.content.userInfo
-        await respond(login: userInfo["login"] as? String, thread: userInfo["thread"] as? Data, event: userInfo["event"] as? String)
+        await respond(reply, login: userInfo["login"] as? String, thread: userInfo["thread"] as? Data, event: userInfo["event"] as? String)
     }
 }

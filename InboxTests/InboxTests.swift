@@ -211,6 +211,14 @@ struct InboxTests {
         #expect(inbox.failedAction?.title.japanese == "“Fix popup position”を既読にできませんでした")
     }
 
+    @Test func aFailureBeforeMarkingAsReadFromABannerNamesTheThread() {
+        let inbox = makeInbox()
+
+        inbox.reportFailure(URLError(.notConnectedToInternet), markingAsRead: Fixture.notification(Fixture.pullRequest))
+
+        #expect(inbox.failedAction?.title.english == "Couldn’t Mark “Fix popup position” as Read")
+    }
+
     @Test func aReportedFailureCanBeDismissed() async throws {
         let inbox = makeInbox()
         server.reply(502)

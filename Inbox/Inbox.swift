@@ -201,7 +201,7 @@ final class Inbox {
     // Called in a task that starts at once, the thread leaves what is shown before this returns:
     // marking one thread after another must not wait for each answer.
     func markAsRead(_ notification: GitHub.Notification) async {
-        await perform(on: notification, failing: "Couldn’t Mark “\(notification.subject.title)” as Read") {
+        await perform(on: notification, failing: Self.failure(markingAsRead: notification)) {
             markingAsRead.insert(notification.id)
             defer { markingAsRead.remove(notification.id) }
             try await recordRead(notification)
@@ -211,7 +211,7 @@ final class Inbox {
     // At the event a banner told of, when it was opened from one: the description that told of it
     // may since have been replaced by one of newer activity.
     func open(_ notification: GitHub.Notification, at event: URL? = nil) async {
-        await perform(on: notification, failing: "Couldn’t Open “\(notification.subject.title)”") {
+        await perform(on: notification, failing: Self.failure(opening: notification)) {
             let page = if let event { event } else { await webPage(of: notification) }
             guard openURL(page ?? GitHub.inbox) else { throw BrowserDidNotOpen() }
             if page != nil {
@@ -221,7 +221,19 @@ final class Inbox {
     }
 
     func reportFailure(_ error: any Error, opening notification: GitHub.Notification) {
-        report(FailedAction(title: "Couldn’t Open “\(notification.subject.title)”", problem: Problem(error)))
+        report(FailedAction(title: Self.failure(opening: notification), problem: Problem(error)))
+    }
+
+    func reportFailure(_ error: any Error, markingAsRead notification: GitHub.Notification) {
+        report(FailedAction(title: Self.failure(markingAsRead: notification), problem: Problem(error)))
+    }
+
+    private static func failure(opening notification: GitHub.Notification) -> LocalizedStringResource {
+        "Couldn’t Open “\(notification.subject.title)”"
+    }
+
+    private static func failure(markingAsRead notification: GitHub.Notification) -> LocalizedStringResource {
+        "Couldn’t Mark “\(notification.subject.title)” as Read"
     }
 
     func dismissFailedAction() {
