@@ -7,6 +7,7 @@ struct MenuContent: View {
 
     @Environment(\.openWindow) private var openWindow
     @Environment(\.openSettings) private var openSettings
+    @Environment(\.openURL) private var openURL
 
     private static let limit = 10
 
@@ -36,6 +37,10 @@ struct MenuContent: View {
             NSApp.activate()
             openWindow(id: "inbox")
         }
+        Button("Open Notifications on GitHub") {
+            openURL(GitHub.inbox)
+        }
+        Divider()
         Button("Settings…") {
             NSApp.activate()
             openSettings()
