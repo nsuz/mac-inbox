@@ -21,7 +21,7 @@ Inbox does one job: telling you as things arrive, so you can keep your unread no
    ```
 
 2. Download `Inbox-<version>.dmg` from [Releases](https://github.com/nsuz/mac-inbox/releases) and drag Inbox to Applications.
-3. Open Inbox. If macOS says it can’t verify the app, open System Settings > Privacy & Security and click Open Anyway. You only need to do this once.
+3. Open Inbox. When macOS asks whether to open an app downloaded from the internet, click Open.
 4. Allow notifications when Inbox asks.
 
 ## Use
