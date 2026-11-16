@@ -21,7 +21,7 @@ struct NotificationDisplayTests {
         ("agent_session_finished", "Copilot session finished"),
     ])
     func explainsWhyAThreadIsInTheInbox(reason: String, description: String) {
-        #expect(GitHub.Notification.describe(reason: reason, type: "PullRequest") == description)
+        #expect(GitHub.Notification.describe(reason: reason, type: "PullRequest").english == description)
     }
 
     // Read as how the thread stands to the viewer, not as something that just happened.
@@ -32,11 +32,11 @@ struct NotificationDisplayTests {
         ("Release", "Yours"),
     ])
     func callsAThreadTheViewerStartedTheirs(type: String, description: String) {
-        #expect(GitHub.Notification.describe(reason: "author", type: type) == description)
+        #expect(GitHub.Notification.describe(reason: "author", type: type).english == description)
     }
 
     @Test func spellsOutAReasonGitHubAddsLater() {
-        #expect(GitHub.Notification.describe(reason: "some_new_reason", type: "PullRequest") == "Some new reason")
+        #expect(GitHub.Notification.describe(reason: "some_new_reason", type: "PullRequest").english == "Some new reason")
     }
 
     @Test(arguments: [
@@ -57,11 +57,31 @@ struct NotificationDisplayTests {
 
     @Test(arguments: [
         ("PullRequest", "Pull request"),
-        ("RepositoryDependabotAlertsThread", "Repository dependabot alerts thread"),
         ("Issue", "Issue"),
+        ("Discussion", "Discussion"),
+        ("Release", "Release"),
+        ("CheckSuite", "Check suite"),
+        ("WorkflowRun", "Workflow run"),
+        ("RepositoryVulnerabilityAlert", "Dependabot alert"),
+        ("RepositoryDependabotAlertsThread", "Dependabot alert"),
+        ("RepositoryInvitation", "Repository invitation"),
     ])
     func namesTheKindOfThreadInWords(type: String, name: String) {
-        #expect(GitHub.Notification.describe(type: type) == name)
+        #expect(GitHub.Notification.describe(type: type).english == name)
+    }
+
+    @Test(arguments: [
+        ("PullRequest", "Pull Request"),
+        ("CheckSuite", "チェックスイート"),
+        ("RepositoryInvitation", "リポジトリへの招待"),
+    ])
+    func namesTheKindOfThreadInJapanese(type: String, name: String) {
+        #expect(GitHub.Notification.describe(type: type).japanese == name)
+    }
+
+    @Test func spellsOutAKindGitHubAddsLater() {
+        #expect(GitHub.Notification.describe(type: "SomethingNew").english == "Something new")
+        #expect(GitHub.Notification.describe(type: "SomethingNew").japanese == "Something new")
     }
 
     @Test(arguments: [
@@ -91,7 +111,7 @@ struct NotificationDisplayTests {
         ("CheckSuite", nil, "Check suite"),
     ])
     func namesWhatTheSymbolStandsFor(type: String, state: GitHub.SubjectState?, name: String) {
-        #expect(GitHub.Notification.describe(type: type, state: state) == name)
+        #expect(GitHub.Notification.describe(type: type, state: state).english == name)
     }
 
     // MARK: - Events
@@ -110,11 +130,11 @@ struct NotificationDisplayTests {
         (.assignedYou, "alice assigned you"),
     ])
     func saysWhoDidWhat(action: GitHub.Event.Action, phrase: String) {
-        #expect(GitHub.Event(action: action, actor: "alice", date: .now, url: nil, text: nil).phrase == phrase)
+        #expect(GitHub.Event(action: action, actor: "alice", date: .now, url: nil, text: nil).phrase.english == phrase)
     }
 
     @Test func namesSomeoneWhoseAccountIsGoneAsGitHubDoes() {
-        #expect(GitHub.Event(action: .commented, actor: nil, date: .now, url: nil, text: nil).phrase == "ghost commented")
+        #expect(GitHub.Event(action: .commented, actor: nil, date: .now, url: nil, text: nil).phrase.english == "ghost commented")
     }
 
     private static let lastRead = Date(timeIntervalSince1970: 1_794_362_400)
@@ -133,5 +153,13 @@ struct NotificationDisplayTests {
 
     @Test func tellsOfTheEventOnAThreadNeverRead() {
         #expect(Self.activity(eventAt: Self.lastRead).unreadEvent(lastReadAt: nil)?.actor == "hubot")
+    }
+
+    @Test func saysWhoDidWhatInJapaneseWordOrder() {
+        #expect(GitHub.Event(action: .commented, actor: "alice", date: .now, url: nil, text: nil).phrase.japanese == "alice がコメントしました")
+    }
+
+    @Test func leavesAReasonGitHubAddsLaterUntranslated() {
+        #expect(GitHub.Notification.describe(reason: "some_new_reason", type: "PullRequest").japanese == "Some new reason")
     }
 }

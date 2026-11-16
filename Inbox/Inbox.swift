@@ -12,7 +12,7 @@ final class Inbox {
     struct BrowserDidNotOpen: Error {}
 
     struct FailedAction {
-        let title: String
+        let title: LocalizedStringResource
         let problem: Problem
     }
 
@@ -228,7 +228,7 @@ final class Inbox {
         failedAction = nil
     }
 
-    private func perform(on notification: GitHub.Notification, failing title: String, _ work: () async throws -> Void) async {
+    private func perform(on notification: GitHub.Notification, failing title: LocalizedStringResource, _ work: () async throws -> Void) async {
         guard threadsInProgress.insert(notification.id).inserted else { return }
         defer { threadsInProgress.remove(notification.id) }
         do {

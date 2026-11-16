@@ -34,7 +34,7 @@ enum ReasonGroup: String, CaseIterable, Identifiable {
         }
     }
 
-    var title: String {
+    var title: LocalizedStringResource {
         switch self {
         case .reviewRequests: "Review requests"
         case .mentions: "Mentions"

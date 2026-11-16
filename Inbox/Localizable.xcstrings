@@ -1,0 +1,984 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "%@" : {
+      "comment" : "Words from elsewhere, such as what GitHub said, shown as they are",
+      "shouldTranslate" : false
+    },
+    "%@ %@" : {
+      "comment" : "What went wrong, then how Inbox recovers",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@%2$@"
+          }
+        }
+      }
+    },
+    "%@ The notification is still unread." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@この通知は未読のままです。"
+          }
+        }
+      }
+    },
+    "%@ approved" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ が承認しました"
+          }
+        }
+      }
+    },
+    "%@ assigned you" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ があなたをアサインしました"
+          }
+        }
+      }
+    },
+    "%@ closed" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ がクローズしました"
+          }
+        }
+      }
+    },
+    "%@ commented" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ がコメントしました"
+          }
+        }
+      }
+    },
+    "%@ marked this ready for review" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ がレビュー可能にしました"
+          }
+        }
+      }
+    },
+    "%@ merged" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ がマージしました"
+          }
+        }
+      }
+    },
+    "%@ reopened" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ が再オープンしました"
+          }
+        }
+      }
+    },
+    "%@ requested changes" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ が変更をリクエストしました"
+          }
+        }
+      }
+    },
+    "%@ requested your review" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ がレビューを依頼しました"
+          }
+        }
+      }
+    },
+    "%@ requested your team’s review" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ が Team にレビューを依頼しました"
+          }
+        }
+      }
+    },
+    "%@ reviewed" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ がレビューしました"
+          }
+        }
+      }
+    },
+    "Advisory credit" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アドバイザリのクレジット"
+          }
+        }
+      }
+    },
+    "Approvals and invitations" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "承認と招待"
+          }
+        }
+      }
+    },
+    "Approve in System Settings…" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "システム設定で許可…"
+          }
+        }
+      }
+    },
+    "Assigned" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アサイン"
+          }
+        }
+      }
+    },
+    "Assignments" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アサイン"
+          }
+        }
+      }
+    },
+    "Can’t Reach GitHub" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GitHub に接続できません"
+          }
+        }
+      }
+    },
+    "Check suite" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "チェックスイート"
+          }
+        }
+      }
+    },
+    "Check the default web browser in System Settings." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "システム設定でデフォルトの Web ブラウザを確認してください。"
+          }
+        }
+      }
+    },
+    "Check your internet connection." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "インターネット接続を確認してください。"
+          }
+        }
+      }
+    },
+    "Closed pull request" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "クローズされた Pull Request"
+          }
+        }
+      }
+    },
+    "Copilot session finished" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copilot のセッションが終了"
+          }
+        }
+      }
+    },
+    "Copilot sessions" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copilot のセッション"
+          }
+        }
+      }
+    },
+    "Couldn’t Change Open at Login" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“ログイン時に開く”を変更できませんでした"
+          }
+        }
+      }
+    },
+    "Couldn’t Mark “%@” as Read" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@”を既読にできませんでした"
+          }
+        }
+      }
+    },
+    "Couldn’t Open the Browser" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ブラウザを開けませんでした"
+          }
+        }
+      }
+    },
+    "Couldn’t Open “%@”" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@”を開けませんでした"
+          }
+        }
+      }
+    },
+    "Dependabot alert" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dependabot アラート"
+          }
+        }
+      }
+    },
+    "Deployment approval requested" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "デプロイの承認の依頼"
+          }
+        }
+      }
+    },
+    "Discussion" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Discussion"
+          }
+        }
+      }
+    },
+    "Draft pull request" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ドラフトの Pull Request"
+          }
+        }
+      }
+    },
+    "Feature requested" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "機能のリクエスト"
+          }
+        }
+      }
+    },
+    "GitHub CLI Failed" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GitHub CLI でエラーが起きました"
+          }
+        }
+      }
+    },
+    "GitHub CLI Not Found" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GitHub CLI が見つかりません"
+          }
+        }
+      }
+    },
+    "GitHub Is Limiting Requests" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GitHub がリクエストを制限しています"
+          }
+        }
+      }
+    },
+    "GitHub Isn’t Responding" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GitHub が応答していません"
+          }
+        }
+      }
+    },
+    "GitHub Refused the Request" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GitHub がリクエストを拒否しました"
+          }
+        }
+      }
+    },
+    "GitHub asked Inbox to wait until %@." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GitHub から %@ まで待つよう求められました。"
+          }
+        }
+      }
+    },
+    "GitHub keeps limiting requests, so Inbox stopped checking." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GitHub がリクエストを制限し続けているため、Inbox は確認を止めました。"
+          }
+        }
+      }
+    },
+    "GitHub returned an error." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GitHub がエラーを返しました。"
+          }
+        }
+      }
+    },
+    "Inbox" : {
+      "shouldTranslate" : false
+    },
+    "Inbox always lists every unread notification. These settings only decide which ones show a banner." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Inbox は未読の通知をすべて一覧に出します。ここでは、どの通知でバナーを出すかだけを決めます。"
+          }
+        }
+      }
+    },
+    "Inbox picks up the account within a minute." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Inbox は 1 分以内にアカウントを読み込みます。"
+          }
+        }
+      }
+    },
+    "Inbox will check again then." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Inbox はその時刻にもう一度確認します。"
+          }
+        }
+      }
+    },
+    "Inbox will try again shortly." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Inbox はまもなくもう一度試します。"
+          }
+        }
+      }
+    },
+    "Inbox will try again when the connection is back." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Inbox は接続が戻ったらもう一度試します。"
+          }
+        }
+      }
+    },
+    "Install GitHub CLI with Homebrew (brew install gh), then sign in with gh auth login." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Homebrew で GitHub CLI をインストールし（brew install gh）、gh auth login でサインインしてください。"
+          }
+        }
+      }
+    },
+    "Invitation" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "招待"
+          }
+        }
+      }
+    },
+    "Issue" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Issue"
+          }
+        }
+      }
+    },
+    "Issue closed as completed" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "完了としてクローズされた Issue"
+          }
+        }
+      }
+    },
+    "Issue closed as duplicate" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重複としてクローズされた Issue"
+          }
+        }
+      }
+    },
+    "Issue closed as not planned" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "計画外としてクローズされた Issue"
+          }
+        }
+      }
+    },
+    "Loading Notifications…" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通知を読み込み中…"
+          }
+        }
+      }
+    },
+    "Mark as Read" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "既読にする"
+          }
+        }
+      }
+    },
+    "Mentioned" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "メンション"
+          }
+        }
+      }
+    },
+    "Mentions" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "メンション"
+          }
+        }
+      }
+    },
+    "Merged pull request" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "マージされた Pull Request"
+          }
+        }
+      }
+    },
+    "New activity" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新しいアクティビティ"
+          }
+        }
+      }
+    },
+    "No Unread Notifications" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未読の通知はありません"
+          }
+        }
+      }
+    },
+    "Notification" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通知"
+          }
+        }
+      }
+    },
+    "Notify me about" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "バナーで知らせるもの"
+          }
+        }
+      }
+    },
+    "OK" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OK"
+          }
+        }
+      }
+    },
+    "Open" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "開く"
+          }
+        }
+      }
+    },
+    "Open Inbox" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Inbox を開く"
+          }
+        }
+      }
+    },
+    "Open Login Items Settings" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ログイン項目の設定を開く"
+          }
+        }
+      }
+    },
+    "Open Notifications on GitHub" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GitHub で通知を開く"
+          }
+        }
+      }
+    },
+    "Open at login" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ログイン時に開く"
+          }
+        }
+      }
+    },
+    "Open issue" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "オープンの Issue"
+          }
+        }
+      }
+    },
+    "Open pull request" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "オープンの Pull Request"
+          }
+        }
+      }
+    },
+    "Pull request" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pull Request"
+          }
+        }
+      }
+    },
+    "Quit Inbox" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Inbox を終了"
+          }
+        }
+      }
+    },
+    "Release" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "リリース"
+          }
+        }
+      }
+    },
+    "Repository invitation" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "リポジトリへの招待"
+          }
+        }
+      }
+    },
+    "Review requested" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "レビューの依頼"
+          }
+        }
+      }
+    },
+    "Review requests" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "レビューの依頼"
+          }
+        }
+      }
+    },
+    "Run gh auth login in Terminal." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ターミナルで gh auth login を実行してください。"
+          }
+        }
+      }
+    },
+    "Security alert" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "セキュリティアラート"
+          }
+        }
+      }
+    },
+    "Security alerts" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "セキュリティアラート"
+          }
+        }
+      }
+    },
+    "Settings…" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "設定…"
+          }
+        }
+      }
+    },
+    "Show in menu bar" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "メニューバーに表示"
+          }
+        }
+      }
+    },
+    "Sign In to GitHub CLI" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GitHub CLI にサインインしてください"
+          }
+        }
+      }
+    },
+    "Subscribed" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サブスクライブ中"
+          }
+        }
+      }
+    },
+    "Team mentioned" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Team へのメンション"
+          }
+        }
+      }
+    },
+    "Threads you took part in" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "参加したスレッド"
+          }
+        }
+      }
+    },
+    "Try Again" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "再試行"
+          }
+        }
+      }
+    },
+    "Waiting for your review" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "レビュー待ち"
+          }
+        }
+      }
+    },
+    "Watched repositories and threads" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ウォッチしているリポジトリとスレッド"
+          }
+        }
+      }
+    },
+    "Watching" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ウォッチ中"
+          }
+        }
+      }
+    },
+    "Workflow run" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ワークフローの実行"
+          }
+        }
+      }
+    },
+    "Workflow runs" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ワークフローの実行"
+          }
+        }
+      }
+    },
+    "You took part" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "参加中"
+          }
+        }
+      }
+    },
+    "Your discussion" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自分の Discussion"
+          }
+        }
+      }
+    },
+    "Your issue" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自分の Issue"
+          }
+        }
+      }
+    },
+    "Your pull request" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自分の Pull Request"
+          }
+        }
+      }
+    },
+    "Yours" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自分のもの"
+          }
+        }
+      }
+    },
+    "macOS didn’t accept the change. You can check Inbox in Login Items & Extensions in System Settings." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "macOS が変更を受け付けませんでした。システム設定の“ログイン項目と機能拡張”で Inbox を確認できます。"
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.0"
+}

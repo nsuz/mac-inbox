@@ -199,8 +199,16 @@ struct InboxTests {
         await inbox.markAsRead(Fixture.notification(Fixture.thread(id: "1")))
 
         #expect(inbox.notifications.map(\.id) == ["1"])
-        #expect(inbox.failedAction?.title == "Couldn’t Mark “Fix popup position” as Read")
-        #expect(inbox.failedAction?.problem.actionMessage == "GitHub returned an error. The notification is still unread.")
+        #expect(inbox.failedAction?.title.english == "Couldn’t Mark “Fix popup position” as Read")
+        #expect(inbox.failedAction?.problem.actionMessage.english == "GitHub returned an error. The notification is still unread.")
+    }
+
+    @Test func aFailureToMarkAsReadNamesTheThreadInJapaneseWordOrder() async throws {
+        let inbox = makeInbox()
+        server.reply(502)
+        await inbox.markAsRead(Fixture.notification(Fixture.thread(id: "1")))
+
+        #expect(inbox.failedAction?.title.japanese == "“Fix popup position”を既読にできませんでした")
     }
 
     @Test func aReportedFailureCanBeDismissed() async throws {
@@ -268,7 +276,7 @@ struct InboxTests {
         await inbox.markAsRead(Fixture.notification(Fixture.thread(id: "1")))
         await inbox.markAsRead(Fixture.notification(Fixture.thread(id: "2", title: "Another thread")))
 
-        #expect(inbox.failedAction?.title == "Couldn’t Mark “Fix popup position” as Read")
+        #expect(inbox.failedAction?.title.english == "Couldn’t Mark “Fix popup position” as Read")
     }
 
     @Test func aThreadMarkedAsReadWhileARefreshIsUnderwayDoesNotComeBack() async throws {
@@ -436,8 +444,8 @@ struct InboxTests {
 
         #expect(server.requests.count == 2)
         #expect(inbox.notifications.map(\.id) == ["1001"])
-        #expect(inbox.failedAction?.title == "Couldn’t Open “Fix popup position”")
-        #expect(inbox.failedAction?.problem.title == "Couldn’t Open the Browser")
+        #expect(inbox.failedAction?.title.english == "Couldn’t Open “Fix popup position”")
+        #expect(inbox.failedAction?.problem.title.english == "Couldn’t Open the Browser")
     }
 
     @Test func aThreadThatIsBeingOpenedIsNotOpenedOrMarkedAgainMeanwhile() async throws {

@@ -13,10 +13,10 @@ struct NotificationRow: View {
                     .lineLimit(2)
                 HStack(spacing: 4) {
                     Text(notification.repository.fullName)
-                    Text("·")
+                    Text(verbatim: "·")
                     Text(GitHub.Notification.describe(reason: notification.reason, type: notification.subject.type))
                     if let event = activity?.unreadEvent(lastReadAt: notification.lastReadAt) {
-                        Text("·")
+                        Text(verbatim: "·")
                         // The first to give way when the row is narrow.
                         Text(event.phrase)
                             .layoutPriority(-1)
@@ -49,7 +49,7 @@ struct NotificationRow: View {
 extension GitHub.Notification {
     // How the thread stands to the viewer. Not what the viewer did: shown with every new activity,
     // "You commented" would read as the news. Whole phrases, so that each can be translated whole.
-    static func describe(reason: String, type: String) -> String {
+    static func describe(reason: String, type: String) -> LocalizedStringResource {
         switch (reason, type) {
         case ("review_requested", _): "Review requested"
         case ("mention", _): "Mentioned"
@@ -69,14 +69,23 @@ extension GitHub.Notification {
         case ("invitation", _): "Invitation"
         case ("member_feature_requested", _): "Feature requested"
         case ("agent_session_finished", _): "Copilot session finished"
-        default: sentence(from: reason)
+        default: .verbatim(sentence(from: reason))
         }
     }
 
-    static func describe(type: String) -> String {
-        // Splits camel case at each lowercase-to-uppercase boundary: "PullRequest" → "Pull Request".
-        let words = type.replacing(/(?<lower>[a-z])(?<upper>[A-Z])/) { "\($0.lower) \($0.upper)" }.lowercased()
-        return sentence(from: words)
+    static func describe(type: String) -> LocalizedStringResource {
+        switch type {
+        case "PullRequest": "Pull request"
+        case "Issue": "Issue"
+        case "Discussion": "Discussion"
+        case "Release": "Release"
+        case "CheckSuite": "Check suite"
+        case "WorkflowRun": "Workflow run"
+        case "RepositoryVulnerabilityAlert", "RepositoryDependabotAlertsThread": "Dependabot alert"
+        case "RepositoryInvitation": "Repository invitation"
+        // Splits camel case at each lowercase-to-uppercase boundary: "SomethingNew" → "Something new".
+        default: .verbatim(sentence(from: type.replacing(/(?<lower>[a-z])(?<upper>[A-Z])/) { "\($0.lower) \($0.upper)" }.lowercased()))
+        }
     }
 
     private static func sentence(from identifier: String) -> String {
@@ -85,7 +94,7 @@ extension GitHub.Notification {
     }
 
     // Whole phrases rather than a state joined to a kind, so that each can be translated whole.
-    static func describe(type: String, state: GitHub.SubjectState?) -> String {
+    static func describe(type: String, state: GitHub.SubjectState?) -> LocalizedStringResource {
         switch state {
         case nil: describe(type: type)
         case .open: type == "Issue" ? "Open issue" : "Open pull request"
@@ -136,7 +145,7 @@ extension GitHub.Event {
         actor ?? "ghost"
     }
 
-    var phrase: String {
+    var phrase: LocalizedStringResource {
         switch action {
         case .commented: "\(actorName) commented"
         case .approved: "\(actorName) approved"

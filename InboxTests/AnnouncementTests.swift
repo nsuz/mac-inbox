@@ -7,11 +7,11 @@ struct AnnouncementTests {
     private let notification = Fixture.notification(Fixture.pullRequest)
 
     @Test func replacesAnyEarlierNotificationForTheSameThread() {
-        #expect(Announcement.request(for: notification, activity: nil, login: "octo").identifier == "1001")
+        #expect(Announcement.request(for: notification, activity: nil, login: "octo", locale: .english).identifier == "1001")
     }
 
     @Test func headlinesTheThreadAndSaysWhereAndWhy() {
-        let content = Announcement.request(for: notification, activity: nil, login: "octo").content
+        let content = Announcement.request(for: notification, activity: nil, login: "octo", locale: .english).content
 
         #expect(content.title == "Fix popup position")
         #expect(content.subtitle == "octo/app · Review requested")
@@ -24,7 +24,7 @@ struct AnnouncementTests {
 
     private func content(of notification: GitHub.Notification, state: GitHub.SubjectState? = .open, event: GitHub.Event?) -> UNNotificationContent {
         let activity = GitHub.Activity(asOf: notification.updatedAt, state: state, event: event, awaitsYourReview: false)
-        return Announcement.request(for: notification, activity: activity, login: "octo").content
+        return Announcement.request(for: notification, activity: activity, login: "octo", locale: .english).content
     }
 
     @Test(arguments: [
@@ -69,15 +69,15 @@ struct AnnouncementTests {
     }
 
     @Test func groupsNotificationsByRepositoryAndHidesDetailsWhenPreviewsAreOff() {
-        let content = Announcement.request(for: notification, activity: nil, login: "octo").content
+        let content = Announcement.request(for: notification, activity: nil, login: "octo", locale: .english).content
 
         #expect(content.threadIdentifier == "octo/app")
-        #expect(content.categoryIdentifier == Announcement.category.identifier)
-        #expect(Announcement.category.hiddenPreviewsBodyPlaceholder == "New activity")
+        #expect(content.categoryIdentifier == Announcement.category(locale: .english).identifier)
+        #expect(Announcement.category(locale: .english).hiddenPreviewsBodyPlaceholder == "New activity")
     }
 
     @Test func carriesTheThreadAndItsAccountSoItOpensAfterARelaunch() throws {
-        let userInfo = Announcement.request(for: notification, activity: nil, login: "octo").content.userInfo
+        let userInfo = Announcement.request(for: notification, activity: nil, login: "octo", locale: .english).content.userInfo
 
         let payload = try #require(Announcement(userInfo: userInfo))
         #expect(payload.login == "octo")

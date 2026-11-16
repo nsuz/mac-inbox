@@ -7,23 +7,28 @@ struct Announcement {
     // The event the banner told of, if any.
     let event: URL?
 
-    static let category = UNNotificationCategory(
-        identifier: "thread",
-        actions: [],
-        intentIdentifiers: [],
-        hiddenPreviewsBodyPlaceholder: "New activity"
-    )
+    static let categoryIdentifier = "thread"
+
+    static func category(locale: Locale = .current) -> UNNotificationCategory {
+        UNNotificationCategory(
+            identifier: categoryIdentifier,
+            actions: [],
+            intentIdentifiers: [],
+            hiddenPreviewsBodyPlaceholder: LocalizedStringResource("New activity").resolved(in: locale)
+        )
+    }
 
     // The event is carried in the notification, since by the time it is clicked the description
     // that told of it may be gone or replaced by one of newer activity.
-    static func request(for notification: GitHub.Notification, activity: GitHub.Activity?, login: String) -> UNNotificationRequest {
+    static func request(for notification: GitHub.Notification, activity: GitHub.Activity?, login: String, locale: Locale = .current) -> UNNotificationRequest {
         let event = activity?.unreadEvent(lastReadAt: notification.lastReadAt)
         let content = UNMutableNotificationContent()
         content.title = notification.subject.title
-        content.subtitle = "\(notification.repository.fullName) · \(GitHub.Notification.describe(reason: notification.reason, type: notification.subject.type))"
-        content.body = event.map(news) ?? ""
+        let reason = GitHub.Notification.describe(reason: notification.reason, type: notification.subject.type)
+        content.subtitle = "\(notification.repository.fullName) · \(reason.resolved(in: locale))"
+        content.body = event.map { news($0, in: locale) } ?? ""
         content.threadIdentifier = notification.repository.fullName
-        content.categoryIdentifier = category.identifier
+        content.categoryIdentifier = categoryIdentifier
         content.sound = .default
         content.userInfo = ["login": login, "thread": (try? GitHub.encoder.encode(notification)) ?? Data()]
         if let url = event?.url {
@@ -34,9 +39,9 @@ struct Announcement {
 
     // What someone wrote, in their own words as a message notification gives them; otherwise what
     // they did. The reason is only why the thread is in the inbox.
-    private static func news(_ event: GitHub.Event) -> String {
+    private static func news(_ event: GitHub.Event, in locale: Locale) -> String {
         let excerpt = event.excerpt
-        return excerpt.isEmpty ? event.phrase : "\(event.actorName): \(excerpt)"
+        return excerpt.isEmpty ? event.phrase.resolved(in: locale) : "\(event.actorName): \(excerpt)"
     }
 
     init?(userInfo: [AnyHashable: Any]) {

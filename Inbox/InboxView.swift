@@ -36,7 +36,7 @@ struct InboxView: View {
             SelectedNotification(open: { open(notification) }, markAsRead: { markAsRead(notification) })
         })
         .alert(
-            inbox.failedAction?.title ?? "",
+            inbox.failedAction?.title ?? .verbatim(""),
             isPresented: Binding(get: { inbox.failedAction != nil }, set: { if !$0 { inbox.dismissFailedAction() } }),
             presenting: inbox.failedAction
         ) { _ in

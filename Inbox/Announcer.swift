@@ -17,7 +17,7 @@ final class Announcer: NSObject {
 
     func register() {
         center.delegate = self
-        center.setNotificationCategories([Announcement.category])
+        center.setNotificationCategories([Announcement.category()])
     }
 
     // Described first, so that a banner can tell what happened; a thread whose activity could not
