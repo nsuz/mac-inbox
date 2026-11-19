@@ -40,7 +40,7 @@ struct Announcement {
 
     // The event is carried in the notification, since by the time it is clicked the description
     // that told of it may be gone or replaced by one of newer activity.
-    static func request(for notification: GitHub.Notification, activity: GitHub.Activity?, login: String, locale: Locale = .current) -> UNNotificationRequest {
+    static func request(for notification: GitHub.Notification, activity: GitHub.Activity?, login: String, sound: UNNotificationSound = .default, locale: Locale = .current) -> UNNotificationRequest {
         let event = activity?.unreadEvent(lastReadAt: notification.lastReadAt)
         let content = UNMutableNotificationContent()
         content.title = notification.subject.title
@@ -49,7 +49,7 @@ struct Announcement {
         content.body = event.map { news($0, in: locale) } ?? ""
         content.threadIdentifier = notification.repository.fullName
         content.categoryIdentifier = categoryIdentifier
-        content.sound = .default
+        content.sound = sound
         content.userInfo = ["login": login, "thread": (try? GitHub.encoder.encode(notification)) ?? Data()]
         if let url = event?.url {
             content.userInfo["event"] = url.absoluteString

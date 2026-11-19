@@ -30,7 +30,7 @@ final class Announcer: NSObject {
         for notification in news where inbox.isUnread(notification) {
             Self.log.info("Announcing a thread")
             do {
-                try await center.add(Announcement.request(for: notification, activity: inbox.activity(describing: notification), login: login))
+                try await center.add(Announcement.request(for: notification, activity: inbox.activity(describing: notification), login: login, sound: UserDefaults.standard.notificationSound))
             } catch {
                 Self.log.error("Couldn’t announce a thread: \(error, privacy: .public)")
             }

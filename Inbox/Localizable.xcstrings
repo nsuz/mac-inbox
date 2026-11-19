@@ -296,6 +296,16 @@
         }
       }
     },
+    "Default" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "デフォルト"
+          }
+        }
+      }
+    },
     "Dependabot alert" : {
       "localizations" : {
         "ja" : {
@@ -829,6 +839,16 @@
         }
       }
     },
+    "Sound" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通知音"
+          }
+        }
+      }
+    },
     "Subscribed" : {
       "localizations" : {
         "ja" : {
@@ -855,6 +875,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "参加したスレッド"
+          }
+        }
+      }
+    },
+    "To turn the sound off, go to Notifications in System Settings." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通知音をオフにするときは、システム設定の“通知”で設定します。"
           }
         }
       }

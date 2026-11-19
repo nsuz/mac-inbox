@@ -22,6 +22,11 @@ struct SettingsView: View {
                 Text("Inbox always lists every unread notification. These settings only decide which ones show a banner.")
             }
             Section {
+                SoundPicker()
+            } footer: {
+                Text("To turn the sound off, go to Notifications in System Settings.")
+            }
+            Section {
                 Toggle("Show in menu bar", isOn: $showsMenuBarExtra)
                 Toggle("Open at login", isOn: Binding(get: { loginItem == .enabled }, set: setOpensAtLogin))
                 if loginItem == .requiresApproval {
@@ -74,5 +79,25 @@ private struct ReasonToggle: View {
 
     var body: some View {
         Toggle(group.title, isOn: Binding(get: { !isMuted }, set: { isMuted = !$0 }))
+    }
+}
+
+private struct SoundPicker: View {
+    @AppStorage(NotificationSound.key) private var sound: String?
+
+    var body: some View {
+        Picker("Sound", selection: $sound) {
+            Text("Default").tag(String?.none)
+            Divider()
+            ForEach(NotificationSound.names, id: \.self) { name in
+                Text(verbatim: name).tag(Optional(name))
+            }
+        }
+        // The default sound has no name to play it by outside a notification.
+        .onChange(of: sound) { _, name in
+            if let name {
+                NSSound(named: name)?.play()
+            }
+        }
     }
 }
