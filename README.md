@@ -31,7 +31,7 @@ Inbox does one job: telling you as things arrive, so you can keep your unread no
 - Press ⇧⌘U to mark the selected row as read without opening it. The selection moves to the next row, so you can work down the list from the keyboard.
 - The Dock icon shows how many notifications are unread. Banners for threads you have read anywhere, on GitHub or in another app, are taken back.
 
-In Settings, choose which kinds of notifications show a banner (Inbox still lists every one), show Inbox in the menu bar, and open it at login.
+In Settings, choose which kinds of notifications show a banner (Inbox still lists every one) and the sound they play, show Inbox in the menu bar, and open it at login.
 
 Inbox speaks English and Japanese, following your Mac’s language. To use a different one for Inbox alone, choose it in System Settings > General > Language & Region > Applications.
 
