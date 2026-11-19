@@ -10,6 +10,12 @@ struct NotificationSoundTests {
         #expect(NotificationSound.names.contains("Glass"))
     }
 
+    @Test func listsOnlySoundsByNameInOrder() {
+        let files = ["Tink.aiff", ".DS_Store", "Glass.aiff", "Read Me.txt", "Ping.wav"]
+
+        #expect(NotificationSound.names(of: files) == ["Glass", "Ping", "Tink"])
+    }
+
     @Test func playsTheDefaultSoundUntilOneIsChosen() {
         #expect(defaults.notificationSound == .default)
     }
